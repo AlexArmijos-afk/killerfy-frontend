@@ -1,0 +1,56 @@
+.registro-content {
+  --background: #121212;
+}
+
+.registro-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 24px;
+  min-height: 100vh;
+}
+
+.registro-logo {
+  text-align: center;
+  margin-bottom: 32px;
+
+  ion-icon {
+    font-size: 56px;
+    color: #1db954;
+  }
+
+  h1 {
+    color: white;
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+
+  p {
+    color: #888;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+}
+
+.registro-item {
+  --background: #1e1e1e;
+  --color: white;
+  --border-color: #333;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.registro-btn {
+  margin-top: 24px;
+  --background: #1db954;
+  --color: #000;
+  font-weight: bold;
+}
+
+.error-msg {
+  color: #ff4444;
+  font-size: 12px;
+  padding-left: 8px;
+  margin-bottom: 8px;
+}

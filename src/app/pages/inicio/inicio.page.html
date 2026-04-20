@@ -1,0 +1,80 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Killerfy</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment [value]="segmentoActivo" (ionChange)="cambiarSegmento($event)">
+      <ion-segment-button value="todas">
+        <ion-label>Todas</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="artistas">
+        <ion-label>Artistas</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="albumes">
+        <ion-label>Álbumes</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <!-- TODAS LAS CANCIONES -->
+  <ion-list *ngIf="!cargando && segmentoActivo === 'todas'">
+    <ion-item *ngFor="let cancion of canciones" (click)="reproducirCancion(cancion)" button>
+      <ion-icon name="musical-notes" slot="start" class="cancion-icon"></ion-icon>
+      <ion-label>
+        <h2>{{ cancion.titulo }}</h2>
+        <p>{{ cancion.artista }} · {{ cancion.album }}</p>
+      </ion-label>
+      <ion-note slot="end">{{ formatearDuracion(cancion.duracionSegundos) }}</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <!-- POR ARTISTAS -->
+  <div *ngIf="!cargando && segmentoActivo === 'artistas'">
+    <div *ngFor="let artista of artistas" class="grupo">
+      <div class="grupo-header">
+        <ion-icon name="person-circle"></ion-icon>
+        <span>{{ artista.nombre }}</span>
+        <ion-note>{{ artista.canciones.length }} canciones</ion-note>
+      </div>
+      <ion-list>
+        <ion-item *ngFor="let cancion of artista.canciones" (click)="reproducirCancion(cancion)" button>
+          <ion-icon name="musical-notes" slot="start" class="cancion-icon"></ion-icon>
+          <ion-label>
+            <h2>{{ cancion.titulo }}</h2>
+            <p>{{ cancion.album }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ formatearDuracion(cancion.duracionSegundos) }}</ion-note>
+        </ion-item>
+      </ion-list>
+    </div>
+  </div>
+
+  <!-- POR ÁLBUMES -->
+  <div *ngIf="!cargando && segmentoActivo === 'albumes'">
+    <div *ngFor="let album of albumes" class="grupo">
+      <div class="grupo-header">
+        <ion-icon name="albums"></ion-icon>
+        <span>{{ album.nombre }}</span>
+        <ion-note>{{ album.artista }}</ion-note>
+      </div>
+      <ion-list>
+        <ion-item *ngFor="let cancion of album.canciones" (click)="reproducirCancion(cancion)" button>
+          <ion-icon name="musical-notes" slot="start" class="cancion-icon"></ion-icon>
+          <ion-label>
+            <h2>{{ cancion.titulo }}</h2>
+            <p>{{ formatearDuracion(cancion.duracionSegundos) }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </div>
+  </div>
+
+</ion-content>

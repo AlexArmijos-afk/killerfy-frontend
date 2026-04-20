@@ -1,0 +1,77 @@
+<ion-header>
+  <ion-toolbar>
+    <button class="cerrar-btn" (click)="cerrar()">
+      <ion-icon name="chevron-down"></ion-icon>
+    </button>
+    <ion-title>Reproduciendo</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+  <div class="cancion-info" *ngIf="cancion">
+    <div class="portada">
+      <ion-icon name="musical-notes"></ion-icon>
+    </div>
+    <h2>{{ cancion.titulo }}</h2>
+    <p>{{ cancion.artista }} · {{ cancion.album }}</p>
+  </div>
+
+  <div class="progreso-container">
+    <ion-range
+      [min]="0"
+      [max]="duracion"
+      [value]="progreso"
+      (ionKnobMoveStart)="onRangeStart()"
+      (ionChange)="onRangeChange($event)"
+      (ionKnobMoveEnd)="onRangeEnd($event)">
+    </ion-range>
+    <div class="tiempos">
+      <span>{{ formatearTiempo(progreso) }}</span>
+      <span>{{ formatearTiempo(duracion) }}</span>
+    </div>
+  </div>
+
+  <div class="controles">
+    <button class="ctrl-btn" (click)="reproductorService.anterior()">
+      <ion-icon name="play-skip-back"></ion-icon>
+    </button>
+    <button class="ctrl-btn play-principal" (click)="reproductorService.togglePlay()">
+      <ion-icon [name]="reproduciendo ? 'pause-circle' : 'play-circle'"></ion-icon>
+    </button>
+    <button class="ctrl-btn" (click)="reproductorService.siguiente()">
+      <ion-icon name="play-skip-forward"></ion-icon>
+    </button>
+  </div>
+
+  <!-- COLA -->
+  <div class="cola-titulo" *ngIf="cancion">
+    Siguientes canciones
+  </div>
+
+  <ion-list *ngIf="cancion">
+
+    <!-- Canción actual -->
+    <ion-item class="cola-item activa">
+      <div class="ecualizador" slot="start" *ngIf="reproduciendo">
+        <span></span><span></span><span></span>
+      </div>
+      <ion-icon name="musical-notes" slot="start" class="cola-icon" *ngIf="!reproduciendo"></ion-icon>
+      <ion-label>
+        <h3 class="titulo-activo">{{ cancion.titulo }}</h3>
+        <p class="artista-activo">{{ cancion.artista }} · Reproduciendo ahora</p>
+      </ion-label>
+    </ion-item>
+
+    <!-- Siguientes -->
+    <ion-item *ngFor="let c of cola" class="cola-item">
+      <ion-icon name="musical-notes" slot="start" class="cola-icon"></ion-icon>
+      <ion-label>
+        <h3>{{ c.titulo }}</h3>
+        <p>{{ c.artista }}</p>
+      </ion-label>
+    </ion-item>
+
+  </ion-list>
+
+</ion-content>

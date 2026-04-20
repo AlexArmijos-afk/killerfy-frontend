@@ -1,0 +1,14 @@
+<div class="mini-player" *ngIf="cancion" (click)="abrirReproductor()">
+  <div class="progreso-bar">
+    <div class="progreso-fill" [style.width.%]="porcentaje"></div>
+  </div>
+  <div class="mini-content">
+    <div class="mini-info">
+      <span class="titulo">{{ cancion.titulo }}</span>
+      <span class="artista">{{ cancion.artista }}</span>
+    </div>
+    <button class="play-btn" (click)="togglePlay($event)">
+      <ion-icon [name]="reproduciendo ? 'pause-circle' : 'play-circle'"></ion-icon>
+    </button>
+  </div>
+</div>

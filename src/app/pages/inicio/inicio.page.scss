@@ -1,0 +1,76 @@
+ion-toolbar {
+  --background: #121212;
+  --color: white;
+}
+
+ion-title {
+  color: #1db954;
+  font-weight: bold;
+}
+
+ion-segment {
+  --background: #121212;
+}
+
+ion-segment-button {
+  --color: #888;
+  --color-checked: #1db954;
+  --indicator-color: #1db954;
+}
+
+ion-content {
+  --background: #121212;
+}
+
+ion-list {
+  background: transparent;
+}
+
+ion-item {
+  --background: #121212;
+  --color: white;
+  --border-color: #2a2a2a;
+}
+
+.cancion-icon {
+  color: #1db954;
+  font-size: 20px;
+}
+
+ion-note {
+  color: #888;
+  font-size: 12px;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 60px;
+
+  ion-spinner {
+    color: #1db954;
+  }
+}
+
+.grupo {
+  margin-bottom: 8px;
+}
+
+.grupo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 4px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+
+  ion-icon {
+    color: #1db954;
+    font-size: 20px;
+  }
+
+  ion-note {
+    margin-left: auto;
+  }
+}

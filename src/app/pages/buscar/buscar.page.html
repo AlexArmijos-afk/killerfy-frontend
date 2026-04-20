@@ -1,0 +1,42 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Buscar</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Canciones, artistas..."
+      [value]="terminoBusqueda"
+      (ionInput)="onInput($event)"
+      animated>
+    </ion-searchbar>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+  <div *ngIf="cargando" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <ion-list *ngIf="!cargando && resultados.length > 0">
+    <ion-item *ngFor="let cancion of resultados" (click)="reproducirCancion(cancion)" button>
+      <ion-icon name="musical-notes" slot="start" class="resultado-icon"></ion-icon>
+      <ion-label>
+        <h2>{{ cancion.titulo }}</h2>
+        <p>{{ cancion.artista }} · {{ cancion.album }}</p>
+      </ion-label>
+      <ion-note slot="end">{{ formatearDuracion(cancion.duracionSegundos) }}</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <div *ngIf="!cargando && buscado && resultados.length === 0" class="empty-state">
+    <ion-icon name="musical-notes"></ion-icon>
+    <p>No se encontraron resultados</p>
+  </div>
+
+  <div *ngIf="!cargando && !buscado" class="empty-state">
+    <ion-icon name="musical-notes"></ion-icon>
+    <p>Busca canciones o artistas</p>
+  </div>
+
+</ion-content>

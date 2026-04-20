@@ -1,0 +1,80 @@
+<ion-content [fullscreen]="true" class="registro-content">
+
+  <div class="registro-container">
+
+    <div class="registro-logo">
+      <ion-icon name="person-add-outline"></ion-icon>
+      <h1>Crear cuenta</h1>
+      <p>Únete a Killerfy</p>
+    </div>
+
+    <form [formGroup]="registroForm" (ngSubmit)="registrarse()">
+
+      <ion-item class="registro-item">
+        <ion-label position="floating">Nombre</ion-label>
+        <ion-input
+          type="text"
+          formControlName="nombre"
+          placeholder="Tu nombre">
+        </ion-input>
+      </ion-item>
+      <div class="error-msg" *ngIf="nombre?.invalid && nombre?.touched">
+        Mínimo 2 caracteres
+      </div>
+
+      <ion-item class="registro-item">
+        <ion-label position="floating">Correo electrónico</ion-label>
+        <ion-input
+          type="email"
+          formControlName="email"
+          placeholder="tu@email.com">
+        </ion-input>
+      </ion-item>
+      <div class="error-msg" *ngIf="email?.invalid && email?.touched">
+        Introduce un email válido
+      </div>
+
+      <ion-item class="registro-item">
+        <ion-label position="floating">Contraseña</ion-label>
+        <ion-input
+          type="password"
+          formControlName="password"
+          placeholder="Contraseña">
+        </ion-input>
+      </ion-item>
+      <div class="error-msg" *ngIf="password?.invalid && password?.touched">
+        Mínimo 4 caracteres
+      </div>
+
+      <ion-item class="registro-item">
+        <ion-label position="floating">Confirmar contraseña</ion-label>
+        <ion-input
+          type="password"
+          formControlName="confirmar"
+          placeholder="Repite la contraseña">
+        </ion-input>
+      </ion-item>
+      <div class="error-msg" *ngIf="registroForm.errors?.['noCoinciden'] && confirmar?.touched">
+        Las contraseñas no coinciden
+      </div>
+
+      <ion-button
+        expand="block"
+        type="submit"
+        class="registro-btn"
+        [disabled]="registroForm.invalid">
+        Crear cuenta
+      </ion-button>
+
+    </form>
+
+    <ion-button
+      expand="block"
+      fill="clear"
+      (click)="irALogin()">
+      ¿Ya tienes cuenta? Inicia sesión
+    </ion-button>
+
+  </div>
+
+</ion-content>

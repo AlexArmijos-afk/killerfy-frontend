@@ -1,0 +1,80 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Perfil</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+  <div *ngIf="cargando" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <div *ngIf="!cargando && usuario">
+
+    <!-- Info usuario -->
+    <div class="perfil-header">
+      <div class="avatar-container">
+        <ion-icon name="person-circle" class="avatar-icon"></ion-icon>
+      </div>
+      <h2>{{ usuario.nombre }}</h2>
+      <p class="email">{{ usuario.email }}</p>
+      <p class="fecha" *ngIf="fechaRegistro">
+        <ion-icon name="calendar-outline"></ion-icon>
+        Miembro desde {{ formatearFecha(fechaRegistro) }}
+      </p>
+    </div>
+
+    <!-- Playlists -->
+    <div class="seccion-titulo">
+      <ion-icon name="list"></ion-icon>
+      <span>Mis playlists</span>
+      <ion-note>{{ playlists.length }}</ion-note>
+    </div>
+
+    <div *ngIf="playlists.length === 0" class="empty-state">
+      <ion-icon name="musical-notes"></ion-icon>
+      <p>No tienes playlists todavía</p>
+    </div>
+
+    <ion-accordion-group *ngIf="playlists.length > 0">
+      <ion-accordion *ngFor="let playlist of playlists" [value]="playlist.id.toString()">
+
+        <ion-item slot="header" class="playlist-header">
+          <ion-icon name="musical-notes" slot="start" class="playlist-icon"></ion-icon>
+          <ion-label>
+            <h2>{{ playlist.nombre }}</h2>
+            <p>{{ playlist.descripcion }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ playlist.canciones.length }} canciones</ion-note>
+        </ion-item>
+
+        <ion-list slot="content">
+          <ion-item *ngFor="let item of playlist.canciones" class="cancion-item">
+            <ion-note slot="start" class="orden">{{ item.orden }}</ion-note>
+            <ion-label>
+              <h3>{{ item.cancion.titulo }}</h3>
+              <p>{{ item.cancion.artista }}</p>
+            </ion-label>
+            <ion-note slot="end">{{ formatearDuracion(item.cancion.duracionSegundos) }}</ion-note>
+          </ion-item>
+        </ion-list>
+
+      </ion-accordion>
+    </ion-accordion-group>
+
+    <!-- Cerrar sesión -->
+    <div class="logout-container">
+      <ion-button
+        expand="block"
+        fill="outline"
+        color="danger"
+        (click)="cerrarSesion()">
+        <ion-icon name="log-out-outline" slot="start"></ion-icon>
+        Cerrar sesión
+      </ion-button>
+    </div>
+
+  </div>
+
+</ion-content>

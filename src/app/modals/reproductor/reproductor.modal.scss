@@ -1,0 +1,135 @@
+ion-toolbar {
+  --background: #121212;
+  --color: white;
+  position: relative;
+}
+
+.cerrar-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: white;
+  ion-icon { font-size: 24px; }
+}
+
+ion-content { --background: #121212; }
+
+.cancion-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 16px;
+  text-align: center;
+
+  .portada {
+    width: 200px;
+    height: 200px;
+    background: #1e1e1e;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    ion-icon { font-size: 80px; color: #1db954; }
+  }
+
+  h2 { color: white; font-size: 20px; font-weight: bold; margin: 0 0 4px; }
+  p  { color: #888; font-size: 14px; margin: 0; }
+}
+
+.progreso-container {
+  padding: 0 16px;
+
+  ion-range {
+    --bar-background: #333;
+    --bar-background-active: #1db954;
+    --knob-background: #1db954;
+    --knob-size: 14px;
+    padding: 0;
+  }
+
+  .tiempos {
+    display: flex;
+    justify-content: space-between;
+    color: #888;
+    font-size: 12px;
+    margin-top: -8px;
+    padding: 0 4px;
+  }
+}
+
+.controles {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  padding: 24px 16px;
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    ion-icon { font-size: 36px; color: white; }
+
+    &.play-principal ion-icon {
+      font-size: 68px;
+      color: #1db954;
+    }
+  }
+}
+
+.cola-titulo {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-top: 1px solid #2a2a2a;
+}
+
+ion-list { background: transparent; }
+
+.cola-item {
+  --background: #121212;
+  --color: white;
+  --border-color: #2a2a2a;
+}
+
+.cola-icon { color: #888; font-size: 18px; }
+.activa {
+  --background: #1a2e1a;
+  --border-color: #1db954;
+
+  .titulo-activo { color: #1db954 !important; font-weight: 600; }
+  .artista-activo { color: #4caf7d !important; }
+}
+
+.ecualizador {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+  width: 18px;
+  margin-right: 4px;
+
+  span {
+    display: block;
+    width: 4px;
+    background: #1db954;
+    border-radius: 2px;
+    animation: ecualizador 0.8s ease-in-out infinite alternate;
+
+    &:nth-child(1) { height: 60%; animation-delay: 0s; }
+    &:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+    &:nth-child(3) { height: 40%; animation-delay: 0.4s; }
+  }
+}
+
+@keyframes ecualizador {
+  from { transform: scaleY(0.4); }
+  to   { transform: scaleY(1); }
+}
