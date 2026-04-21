@@ -55,33 +55,41 @@ export class RegistroPage {
   get confirmar() { return this.registroForm.get('confirmar'); }
 
   async registrarse() {
-    const loading = await this.loadingCtrl.create({ message: 'Creando cuenta...' });
-    await loading.present();
+  const loading = await this.loadingCtrl.create({ message: 'Creando cuenta...' });
+  await loading.present();
 
-    this.authService.registro(
-      this.registroForm.value.nombre,
-      this.registroForm.value.email,
-      this.registroForm.value.password
-    ).subscribe({
-      next: async (res) => {
-        await loading.dismiss();
-        this.authService.guardarUsuario(res);
-        this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
-      },
-      error: async (err) => {
-        await loading.dismiss();
-        const mensaje = err.status === 409
-          ? 'Este email ya está registrado'
-          : 'Error al crear la cuenta. Inténtalo de nuevo';
-        const alert = await this.alertCtrl.create({
-          header: 'Error',
-          message: mensaje,
-          buttons: ['OK']
-        });
-        await alert.present();
-      }
-    });
-  }
+  const { nombre, email, password } = this.registroForm.value;
+
+  this.authService.registro(nombre, email, password).subscribe({
+    next: async () => {
+      // Registro OK → hacemos login automático para obtener el token
+      this.authService.login(email, password).subscribe({
+        next: async (loginRes) => {
+          await loading.dismiss();
+          this.authService.guardarUsuario(loginRes); // aquí sí viene el token JWT
+          this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
+        },
+        error: async () => {
+          await loading.dismiss();
+          // Cuenta creada pero fallo en login → redirigir a login manual
+          this.router.navigateByUrl('/login', { replaceUrl: true });
+        }
+      });
+    },
+    error: async (err) => {
+      await loading.dismiss();
+      const mensaje = err.status === 409
+        ? 'Este email ya está registrado'
+        : 'Error al crear la cuenta. Inténtalo de nuevo';
+      const alert = await this.alertCtrl.create({
+        header: 'Error',
+        message: mensaje,
+        buttons: ['OK']
+      });
+      await alert.present();
+    }
+  });
+}
 
   irALogin() {
     this.router.navigateByUrl('/login');
