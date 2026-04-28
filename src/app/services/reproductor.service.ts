@@ -14,12 +14,14 @@ export class ReproductorService {
   private _reproduciendo = new BehaviorSubject<boolean>(false);
   private _progreso = new BehaviorSubject<number>(0);
   private _duracion = new BehaviorSubject<number>(0);
+  private _volumen = new BehaviorSubject<number>(1); // 0.0 a 1.0
 
   cancionActual$ = this._cancionActual.asObservable();
   cola$ = this._cola.asObservable();
   reproduciendo$ = this._reproduciendo.asObservable();
   progreso$ = this._progreso.asObservable();
   duracion$ = this._duracion.asObservable();
+  volumen$ = this._volumen.asObservable();
 
   constructor() {
     this.audio.addEventListener('timeupdate', () => this._progreso.next(this.audio.currentTime));
@@ -68,5 +70,18 @@ export class ReproductorService {
 
   buscarPosicion(segundos: number) {
     this.audio.currentTime = segundos;
+  }
+
+  // ─────────────────────────────────────────────────────
+  // Control de volumen (0.0 → mute, 1.0 → máximo)
+  // ─────────────────────────────────────────────────────
+  setVolumen(valor: number) {
+    const vol = Math.min(1, Math.max(0, valor)); // clamp entre 0 y 1
+    this.audio.volume = vol;
+    this._volumen.next(vol);
+  }
+
+  getVolumen(): number {
+    return this._volumen.getValue();
   }
 }

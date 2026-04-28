@@ -1,17 +1,18 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle,
   IonList, IonItem, IonLabel, IonIcon,
   IonButton, IonSpinner, IonAccordion,
-  IonAccordionGroup, IonNote, IonAvatar
+  IonAccordionGroup, IonNote
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { personCircle, musicalNotes, list,
          calendarOutline, logOutOutline, chevronDown } from 'ionicons/icons';
-import { MusicaService, Playlist, Usuario } from '../../services/musica.service';
+import { MusicaService, Playlist } from '../../services/musica.service';
 import { AuthService } from '../../services/auth.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-perfil',
@@ -23,16 +24,15 @@ import { AuthService } from '../../services/auth.service';
     IonContent, IonHeader, IonToolbar, IonTitle,
     IonList, IonItem, IonLabel, IonIcon,
     IonButton, IonSpinner, IonAccordion,
-    IonAccordionGroup, IonNote, IonAvatar
+    IonAccordionGroup, IonNote
   ]
 })
-export class PerfilPage implements OnInit {
+export class PerfilPage implements OnInit, OnDestroy {
 
-  usuario: Usuario | null = null;
-  // Añade esta propiedad
-  fechaRegistro: string | null = null;
+  perfil: any = null;
   playlists: Playlist[] = [];
   cargando = true;
+  private subs = new Subscription();
 
   constructor(
     private musicaService: MusicaService,
@@ -44,22 +44,22 @@ export class PerfilPage implements OnInit {
   }
 
   ngOnInit() {
-  const datos = this.authService.obtenerUsuario();
-  if (datos) {
-    this.usuario = datos;
-    this.musicaService.getPlaylistsUsuario(datos.id).subscribe({
-      next: (data) => {
-        this.playlists = data;
-        // Cogemos la fecha del primer resultado de playlists
-        if (data.length > 0) {
-          this.fechaRegistro = data[0].usuario.fechaRegistro;
-        }
-        this.cargando = false;
-      },
-      error: () => { this.cargando = false; }
-    });
+    this.subs.add(
+      this.authService.getPerfil().subscribe({
+        next: (data) => { this.perfil = data; this.cargarPlaylists(); },
+        error: () => { this.cargando = false; }
+      })
+    );
   }
-}
+
+  private cargarPlaylists() {
+    this.subs.add(
+      this.musicaService.getMisPlaylists().subscribe({
+        next: (data) => { this.playlists = data; this.cargando = false; },
+        error: () => { this.cargando = false; }
+      })
+    );
+  }
 
   formatearFecha(fecha: string): string {
     return new Date(fecha).toLocaleDateString('es-ES', {
@@ -74,7 +74,15 @@ export class PerfilPage implements OnInit {
   }
 
   cerrarSesion() {
-    this.authService.cerrarSesion();
-    this.router.navigateByUrl('/login', { replaceUrl: true });
+    this.authService.cerrarSesion().subscribe({
+      next: () => this.router.navigateByUrl('/login', { replaceUrl: true }),
+      error: () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        this.router.navigateByUrl('/login', { replaceUrl: true });
+      }
+    });
   }
+
+  ngOnDestroy() { this.subs.unsubscribe(); }
 }

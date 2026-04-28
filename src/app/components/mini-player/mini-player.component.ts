@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ModalController, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -6,6 +6,7 @@ import { playCircle, pauseCircle } from 'ionicons/icons';
 import { ReproductorService } from '../../services/reproductor.service';
 import { Cancion } from '../../services/musica.service';
 import { ReproductorModal } from '../../modals/reproductor/reproductor.modal';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-mini-player',
@@ -14,12 +15,13 @@ import { ReproductorModal } from '../../modals/reproductor/reproductor.modal';
   standalone: true,
   imports: [CommonModule, IonIcon]
 })
-export class MiniPlayerComponent implements OnInit {
+export class MiniPlayerComponent implements OnInit, OnDestroy {
 
   cancion: Cancion | null = null;
   reproduciendo = false;
   progreso = 0;
   duracion = 0;
+  private subs = new Subscription();
 
   constructor(
     private reproductorService: ReproductorService,
@@ -29,10 +31,10 @@ export class MiniPlayerComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.reproductorService.cancionActual$.subscribe(c => this.cancion = c);
-    this.reproductorService.reproduciendo$.subscribe(r => this.reproduciendo = r);
-    this.reproductorService.progreso$.subscribe(p => this.progreso = p);
-    this.reproductorService.duracion$.subscribe(d => this.duracion = d);
+    this.subs.add(this.reproductorService.cancionActual$.subscribe(c => this.cancion = c));
+    this.subs.add(this.reproductorService.reproduciendo$.subscribe(r => this.reproduciendo = r));
+    this.subs.add(this.reproductorService.progreso$.subscribe(p => this.progreso = p));
+    this.subs.add(this.reproductorService.duracion$.subscribe(d => this.duracion = d));
   }
 
   get porcentaje(): number {
@@ -52,4 +54,6 @@ export class MiniPlayerComponent implements OnInit {
     });
     await modal.present();
   }
+
+  ngOnDestroy() { this.subs.unsubscribe(); }
 }

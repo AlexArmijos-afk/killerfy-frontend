@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ModalController, IonContent, IonHeader, IonToolbar,
@@ -7,9 +7,11 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { chevronDown, playCircle, pauseCircle,
-         playSkipBack, playSkipForward, musicalNotes } from 'ionicons/icons';
+         playSkipBack, playSkipForward, musicalNotes,
+         volumeLow, volumeHigh } from 'ionicons/icons';
 import { ReproductorService } from '../../services/reproductor.service';
 import { Cancion } from '../../services/musica.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-reproductor-modal',
@@ -22,31 +24,35 @@ import { Cancion } from '../../services/musica.service';
     IonIcon, IonRange, IonList, IonItem, IonLabel
   ]
 })
-export class ReproductorModal implements OnInit {
+export class ReproductorModal implements OnInit, OnDestroy {
 
   cancion: Cancion | null = null;
   cola: Cancion[] = [];
   reproduciendo = false;
   progreso = 0;
   duracion = 0;
+  volumen = 1;       // 0.0 → 1.0
   arrastrando = false;
+  private subs = new Subscription();
 
   constructor(
     private modalCtrl: ModalController,
     public reproductorService: ReproductorService
   ) {
     addIcons({ chevronDown, playCircle, pauseCircle,
-               playSkipBack, playSkipForward, musicalNotes });
+               playSkipBack, playSkipForward, musicalNotes,
+               volumeLow, volumeHigh });
   }
 
   ngOnInit() {
-    this.reproductorService.cancionActual$.subscribe(c => this.cancion = c);
-    this.reproductorService.cola$.subscribe(c => this.cola = c);
-    this.reproductorService.reproduciendo$.subscribe(r => this.reproduciendo = r);
-    this.reproductorService.progreso$.subscribe(p => {
+    this.subs.add(this.reproductorService.cancionActual$.subscribe(c => this.cancion = c));
+    this.subs.add(this.reproductorService.cola$.subscribe(c => this.cola = c));
+    this.subs.add(this.reproductorService.reproduciendo$.subscribe(r => this.reproduciendo = r));
+    this.subs.add(this.reproductorService.duracion$.subscribe(d => this.duracion = d));
+    this.subs.add(this.reproductorService.volumen$.subscribe(v => this.volumen = v));
+    this.subs.add(this.reproductorService.progreso$.subscribe(p => {
       if (!this.arrastrando) this.progreso = p;
-    });
-    this.reproductorService.duracion$.subscribe(d => this.duracion = d);
+    }));
   }
 
   formatearTiempo(segundos: number): string {
@@ -56,12 +62,15 @@ export class ReproductorModal implements OnInit {
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  onRangeStart() { this.arrastrando = true; }
-  onRangeChange(event: any) { this.progreso = event.detail.value; }
-  onRangeEnd(event: any) {
-    this.reproductorService.buscarPosicion(event.detail.value);
-    this.arrastrando = false;
-  }
+  // ─── Barra de progreso ───
+  onRangeStart()           { this.arrastrando = true; }
+  onRangeChange(e: any)    { this.progreso = e.detail.value; }
+  onRangeEnd(e: any)       { this.reproductorService.buscarPosicion(e.detail.value); this.arrastrando = false; }
+
+  // ─── Control de volumen ───
+  onVolumenChange(e: any)  { this.reproductorService.setVolumen(e.detail.value); }
 
   cerrar() { this.modalCtrl.dismiss(); }
+
+  ngOnDestroy() { this.subs.unsubscribe(); }
 }

@@ -3,8 +3,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router } from '@angular/router';
 import { LoadingController, AlertController } from '@ionic/angular/standalone';
 import { AuthService } from '../../services/auth.service';
-import { IonContent, IonItem, IonLabel, IonInput,
-         IonButton, IonIcon } from '@ionic/angular/standalone';
+import { IonContent, IonItem, IonLabel, IonInput, IonButton, IonIcon } from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { musicalNotes } from 'ionicons/icons';
@@ -14,12 +13,8 @@ import { musicalNotes } from 'ionicons/icons';
   templateUrl: './login.page.html',
   styleUrls: ['./login.page.scss'],
   standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    IonContent, IonItem, IonLabel,
-    IonInput, IonButton, IonIcon
-  ]
+  imports: [CommonModule, ReactiveFormsModule,
+    IonContent, IonItem, IonLabel, IonInput, IonButton, IonIcon]
 })
 export class LoginPage {
 
@@ -50,9 +45,9 @@ export class LoginPage {
       this.loginForm.value.email,
       this.loginForm.value.password
     ).subscribe({
-      next: async (res) => {
+      next: async () => {
+        // El token y usuario ya se guardan automáticamente en auth.service tap()
         await loading.dismiss();
-        this.authService.guardarUsuario(res);
         this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
       },
       error: async () => {
@@ -67,7 +62,5 @@ export class LoginPage {
     });
   }
 
-  irARegistro() {
-    this.router.navigateByUrl('/registro');
-  }
+  irARegistro() { this.router.navigateByUrl('/registro'); }
 }

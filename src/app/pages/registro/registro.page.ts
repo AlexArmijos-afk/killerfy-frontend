@@ -3,10 +3,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router } from '@angular/router';
 import { LoadingController, AlertController } from '@ionic/angular/standalone';
 import { AuthService } from '../../services/auth.service';
-import {
-  IonContent, IonItem, IonLabel, IonInput,
-  IonButton, IonIcon
-} from '@ionic/angular/standalone';
+import { IonContent, IonItem, IonLabel, IonInput, IonButton, IonIcon } from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { personAddOutline } from 'ionicons/icons';
@@ -16,12 +13,8 @@ import { personAddOutline } from 'ionicons/icons';
   templateUrl: './registro.page.html',
   styleUrls: ['./registro.page.scss'],
   standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    IonContent, IonItem, IonLabel,
-    IonInput, IonButton, IonIcon
-  ]
+  imports: [CommonModule, ReactiveFormsModule,
+    IonContent, IonItem, IonLabel, IonInput, IonButton, IonIcon]
 })
 export class RegistroPage {
 
@@ -36,10 +29,10 @@ export class RegistroPage {
   ) {
     addIcons({ personAddOutline });
     this.registroForm = this.fb.group({
-      nombre: ['', [Validators.required, Validators.minLength(2)]],
-      email: ['', [Validators.required, Validators.email]],
+      nombre:   ['', [Validators.required, Validators.minLength(2)]],
+      email:    ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(4)]],
-      confirmar: ['', [Validators.required]]
+      confirmar:['', [Validators.required]]
     }, { validators: this.passwordsIguales });
   }
 
@@ -49,49 +42,44 @@ export class RegistroPage {
     return pass === confirmar ? null : { noCoinciden: true };
   }
 
-  get nombre() { return this.registroForm.get('nombre'); }
-  get email() { return this.registroForm.get('email'); }
-  get password() { return this.registroForm.get('password'); }
+  get nombre()    { return this.registroForm.get('nombre'); }
+  get email()     { return this.registroForm.get('email'); }
+  get password()  { return this.registroForm.get('password'); }
   get confirmar() { return this.registroForm.get('confirmar'); }
 
   async registrarse() {
-  const loading = await this.loadingCtrl.create({ message: 'Creando cuenta...' });
-  await loading.present();
+    const loading = await this.loadingCtrl.create({ message: 'Creando cuenta...' });
+    await loading.present();
 
-  const { nombre, email, password } = this.registroForm.value;
+    const { nombre, email, password } = this.registroForm.value;
 
-  this.authService.registro(nombre, email, password).subscribe({
-    next: async () => {
-      // Registro OK → hacemos login automático para obtener el token
-      this.authService.login(email, password).subscribe({
-        next: async (loginRes) => {
-          await loading.dismiss();
-          this.authService.guardarUsuario(loginRes); // aquí sí viene el token JWT
-          this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
-        },
-        error: async () => {
-          await loading.dismiss();
-          // Cuenta creada pero fallo en login → redirigir a login manual
-          this.router.navigateByUrl('/login', { replaceUrl: true });
-        }
-      });
-    },
-    error: async (err) => {
-      await loading.dismiss();
-      const mensaje = err.status === 409
-        ? 'Este email ya está registrado'
-        : 'Error al crear la cuenta. Inténtalo de nuevo';
-      const alert = await this.alertCtrl.create({
-        header: 'Error',
-        message: mensaje,
-        buttons: ['OK']
-      });
-      await alert.present();
-    }
-  });
-}
-
-  irALogin() {
-    this.router.navigateByUrl('/login');
+    this.authService.registro(nombre, email, password).subscribe({
+      next: () => {
+        // Registro OK → login automático (guarda token en tap() del servicio)
+        this.authService.login(email, password).subscribe({
+          next: async () => {
+            await loading.dismiss();
+            this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
+          },
+          error: async () => {
+            await loading.dismiss();
+            // Cuenta creada pero fallo en login → ir a login manual
+            this.router.navigateByUrl('/login', { replaceUrl: true });
+          }
+        });
+      },
+      error: async (err) => {
+        await loading.dismiss();
+        const mensaje = err.status === 400
+          ? 'Este email ya está registrado'
+          : 'Error al crear la cuenta. Inténtalo de nuevo';
+        const alert = await this.alertCtrl.create({
+          header: 'Error', message: mensaje, buttons: ['OK']
+        });
+        await alert.present();
+      }
+    });
   }
+
+  irALogin() { this.router.navigateByUrl('/login'); }
 }

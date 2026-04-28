@@ -1,80 +1,89 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Perfil</ion-title>
+    <ion-title>Mi Perfil</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="ion-padding">
 
-  <div *ngIf="cargando" class="loading-container">
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="ion-text-center ion-padding-top">
     <ion-spinner name="crescent"></ion-spinner>
   </div>
 
-  <div *ngIf="!cargando && usuario">
+  <!-- Contenido cargado -->
+  <div *ngIf="!cargando && perfil">
 
-    <!-- Info usuario -->
-    <div class="perfil-header">
-      <div class="avatar-container">
-        <ion-icon name="person-circle" class="avatar-icon"></ion-icon>
-      </div>
-      <h2>{{ usuario.nombre }}</h2>
-      <p class="email">{{ usuario.email }}</p>
-      <p class="fecha" *ngIf="fechaRegistro">
+    <!-- Cabecera del perfil -->
+    <div class="perfil-header ion-text-center ion-padding-bottom">
+      <ion-icon name="person-circle" class="avatar-icon"></ion-icon>
+      <h2>{{ perfil.nombre }}</h2>
+      <p class="email">{{ perfil.email }}</p>
+      <p class="fecha" *ngIf="perfil.fechaRegistro">
         <ion-icon name="calendar-outline"></ion-icon>
-        Miembro desde {{ formatearFecha(fechaRegistro) }}
+        Miembro desde {{ formatearFecha(perfil.fechaRegistro) }}
       </p>
     </div>
 
-    <!-- Playlists -->
-    <div class="seccion-titulo">
-      <ion-icon name="list"></ion-icon>
-      <span>Mis playlists</span>
-      <ion-note>{{ playlists.length }}</ion-note>
-    </div>
+    <!-- Mis playlists -->
+    <h3 class="seccion-titulo">
+      <ion-icon name="list"></ion-icon> Mis playlists
+    </h3>
 
-    <div *ngIf="playlists.length === 0" class="empty-state">
-      <ion-icon name="musical-notes"></ion-icon>
-      <p>No tienes playlists todavía</p>
-    </div>
+    <p *ngIf="playlists.length === 0" class="ion-text-center sin-playlists">
+      No tienes playlists todavía
+    </p>
 
     <ion-accordion-group *ngIf="playlists.length > 0">
       <ion-accordion *ngFor="let playlist of playlists" [value]="playlist.id.toString()">
 
-        <ion-item slot="header" class="playlist-header">
-          <ion-icon name="musical-notes" slot="start" class="playlist-icon"></ion-icon>
+        <ion-item slot="header">
+          <ion-icon name="musical-notes" slot="start"></ion-icon>
           <ion-label>
-            <h2>{{ playlist.nombre }}</h2>
-            <p>{{ playlist.descripcion }}</p>
+            <h3>{{ playlist.nombre }}</h3>
+            <p>{{ playlist.canciones.length }} canciones</p>
           </ion-label>
-          <ion-note slot="end">{{ playlist.canciones.length }} canciones</ion-note>
         </ion-item>
 
-        <ion-list slot="content">
-          <ion-item *ngFor="let item of playlist.canciones" class="cancion-item">
-            <ion-note slot="start" class="orden">{{ item.orden }}</ion-note>
-            <ion-label>
-              <h3>{{ item.cancion.titulo }}</h3>
-              <p>{{ item.cancion.artista }}</p>
-            </ion-label>
-            <ion-note slot="end">{{ formatearDuracion(item.cancion.duracionSegundos) }}</ion-note>
-          </ion-item>
-        </ion-list>
+        <div slot="content">
+          <p *ngIf="playlist.descripcion" class="descripcion ion-padding-horizontal">
+            {{ playlist.descripcion }}
+          </p>
+
+          <ion-list *ngIf="playlist.canciones.length > 0">
+            <ion-item *ngFor="let item of playlist.canciones">
+              <ion-label>
+                <h4>{{ item.cancion.titulo }}</h4>
+                <ion-note>{{ item.cancion.artista }}</ion-note>
+              </ion-label>
+              <ion-note slot="end">
+                {{ formatearDuracion(item.cancion.duracionSegundos) }}
+              </ion-note>
+            </ion-item>
+          </ion-list>
+
+          <p *ngIf="playlist.canciones.length === 0"
+             class="ion-text-center ion-padding sin-canciones">
+            Esta playlist está vacía
+          </p>
+        </div>
 
       </ion-accordion>
     </ion-accordion-group>
 
     <!-- Cerrar sesión -->
-    <div class="logout-container">
-      <ion-button
-        expand="block"
-        fill="outline"
-        color="danger"
-        (click)="cerrarSesion()">
+    <div class="ion-padding-top ion-padding-bottom">
+      <ion-button expand="block" color="danger" (click)="cerrarSesion()">
         <ion-icon name="log-out-outline" slot="start"></ion-icon>
         Cerrar sesión
       </ion-button>
     </div>
 
+  </div>
+
+  <!-- Error al cargar -->
+  <div *ngIf="!cargando && !perfil" class="ion-text-center ion-padding-top">
+    <p>No se pudo cargar el perfil. Comprueba tu conexión.</p>
   </div>
 
 </ion-content>
