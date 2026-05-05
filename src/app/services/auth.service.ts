@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core';
 })
 export class AuthService {
 
-  private apiUrl = 'http://localhost:8080/api/auth';
+  private apiUrl      = 'http://localhost:8080/api/auth';
   private usuariosUrl = 'http://localhost:8080/api/usuarios';
 
   constructor(private http: HttpClient) {}
@@ -19,15 +19,13 @@ export class AuthService {
   // ─────────────────────────────────────────────────────
   private getTipoDispositivo(): string {
     const platform = Capacitor.getPlatform();
-    if (platform === 'android') return 'ANDROID';
-    if (platform === 'ios') return 'ANDROID'; // iOS usa mismo tipo
-    // Electron/escritorio: el user agent contiene "Electron"
+    if (platform === 'android' || platform === 'ios') return 'ANDROID';
     if (navigator.userAgent.toLowerCase().includes('electron')) return 'DESKTOP';
     return 'WEB';
   }
 
   // ─────────────────────────────────────────────────────
-  // Login — envía tipoDispositivo automáticamente
+  // POST /api/auth/login
   // ─────────────────────────────────────────────────────
   login(email: string, password: string): Observable<any> {
     const tipoDispositivo = this.getTipoDispositivo();
@@ -35,10 +33,10 @@ export class AuthService {
       tap((res: any) => {
         localStorage.setItem('token', res.token);
         localStorage.setItem('usuario', JSON.stringify({
-          id: res.id,
-          nombre: res.nombre,
-          email: res.email,
-          rol: res.rol,
+          id:          res.id,
+          nombre:      res.nombre,
+          email:       res.email,
+          rol:         res.rol,
           dispositivo: res.dispositivo
         }));
       })
@@ -46,15 +44,14 @@ export class AuthService {
   }
 
   // ─────────────────────────────────────────────────────
-  // Registro
+  // POST /api/auth/registro
   // ─────────────────────────────────────────────────────
   registro(nombre: string, email: string, password: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/registro`, { nombre, email, password });
   }
 
   // ─────────────────────────────────────────────────────
-  // Logout — avisa al backend (pone dispositivoActivo=false)
-  // y limpia el localStorage
+  // POST /api/auth/logout
   // ─────────────────────────────────────────────────────
   cerrarSesion(): Observable<any> {
     return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
@@ -65,22 +62,76 @@ export class AuthService {
     );
   }
 
-  // Obtiene el perfil completo del usuario (incluye fechaRegistro y avatar)
+  // ─────────────────────────────────────────────────────
+  // GET /api/usuarios/perfil
+  // ─────────────────────────────────────────────────────
   getPerfil(): Observable<any> {
     return this.http.get(`${this.usuariosUrl}/perfil`);
   }
 
-  // Token
+  // ─────────────────────────────────────────────────────
+  // PUT /api/usuarios/perfil — editar nombre y avatar
+  // Body: { nombre, avatar }
+  // ─────────────────────────────────────────────────────
+  actualizarPerfil(nombre: string, avatar: string): Observable<any> {
+    return this.http.put(`${this.usuariosUrl}/perfil`, { nombre, avatar }).pipe(
+      tap((res: any) => {
+        // Actualiza el nombre en localStorage para que el resto de la app lo vea
+        const usuario = this.obtenerUsuario();
+        if (usuario) {
+          usuario.nombre = res.nombre;
+          localStorage.setItem('usuario', JSON.stringify(usuario));
+        }
+      })
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  // PUT /api/usuarios/cambiar-password
+  // Body: { passwordActual, passwordNueva }
+  // ─────────────────────────────────────────────────────
+  cambiarPassword(passwordActual: string, passwordNueva: string): Observable<any> {
+    return this.http.put(`${this.usuariosUrl}/cambiar-password`, { passwordActual, passwordNueva });
+  }
+
+  // ─────────────────────────────────────────────────────
+  // GET /api/usuarios/mis-dispositivos
+  // Devuelve lista de sesiones (activas e inactivas)
+  // ─────────────────────────────────────────────────────
+  getMisDispositivos(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.usuariosUrl}/mis-dispositivos`);
+  }
+
+  // ─────────────────────────────────────────────────────
+  // Helpers locales
+  // ─────────────────────────────────────────────────────
   obtenerToken(): string | null {
     return localStorage.getItem('token');
   }
 
-  obtenerUsuario() {
+  obtenerUsuario(): any {
     const u = localStorage.getItem('usuario');
     return u ? JSON.parse(u) : null;
   }
-  
+
   estaLogueado(): boolean {
-    return this.obtenerToken() !== null;  // ← mejor comprobar el token
+    return this.obtenerToken() !== null;
   }
+
+  obtenerRolesDelToken(): string[] {
+  const token = this.obtenerToken();
+  if (!token) return [];
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // ← El token usa "rol" (no "roles") y puede ser array o string
+    const rol = payload.rol || payload.roles || [];
+    return Array.isArray(rol) ? rol : [rol];
+  } catch {
+    return [];
+  }
+}
+
+esAdmin(): boolean {
+  return this.obtenerRolesDelToken().includes('ADMIN');
+}
 }

@@ -3,12 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface Cancion {
-  id: number;
-  titulo: string;
-  artista: string;
-  album: string;
+  id:               number;
+  titulo:           string;
+  artista:          string;
+  album:            string;
   duracionSegundos: number;
-  urlAudio: string;
+  nombreArchivo?:   string;
+  urlImagen?:       string;
 }
 
 export interface Usuario {
@@ -37,6 +38,7 @@ export interface Playlist {
 export class MusicaService {
 
   private apiUrl = 'http://localhost:8080/api';
+  private readonly BASE_URL = 'http://localhost:8080';
 
   constructor(private http: HttpClient) {}
 
@@ -52,6 +54,14 @@ export class MusicaService {
   buscarPorArtista(artista: string): Observable<Cancion[]> {
     return this.http.get<Cancion[]>(`${this.apiUrl}/canciones/buscar?artista=${artista}`);
   }
+
+  // GET /api/canciones/{id}
+  getCancionPorId(id: number): Observable<Cancion> {
+    return this.http.get<Cancion>(`${this.apiUrl}/canciones/${id}`);
+  }
+  getStreamUrl(cancionId: number): string {
+  return `${this.BASE_URL}/api/canciones/${cancionId}/stream`;
+}
 // ─── Playlists ─────────────────────────────────────
 
   // Obtiene las playlists del usuario autenticado (usa el token)

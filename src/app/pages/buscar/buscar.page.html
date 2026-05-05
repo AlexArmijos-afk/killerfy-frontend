@@ -4,9 +4,10 @@
   </ion-toolbar>
   <ion-toolbar>
     <ion-searchbar
-      placeholder="Canciones, artistas..."
+      placeholder="Buscar canciones o artistas..."
       [value]="terminoBusqueda"
       (ionInput)="onInput($event)"
+      debounce="0"
       animated>
     </ion-searchbar>
   </ion-toolbar>
@@ -14,29 +15,49 @@
 
 <ion-content>
 
-  <div *ngIf="cargando" class="loading-container">
-    <ion-spinner name="crescent"></ion-spinner>
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="center-state">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
   </div>
 
+  <!-- Sin búsqueda aún -->
+  <div *ngIf="!cargando && !buscado" class="center-state">
+    <ion-icon name="musical-notes"></ion-icon>
+    <p>Busca canciones por título o artista</p>
+  </div>
+
+  <!-- Sin resultados -->
+  <div *ngIf="!cargando && buscado && resultados.length === 0" class="center-state">
+    <ion-icon name="musical-notes"></ion-icon>
+    <p>No se encontraron resultados para "{{ terminoBusqueda }}"</p>
+  </div>
+
+  <!-- Resultados -->
   <ion-list *ngIf="!cargando && resultados.length > 0">
-    <ion-item *ngFor="let cancion of resultados" (click)="reproducirCancion(cancion)" button>
-      <ion-icon name="musical-notes" slot="start" class="resultado-icon"></ion-icon>
+    <ion-item
+      *ngFor="let cancion of resultados"
+      button
+      (click)="reproducirCancion(cancion)">
+
+      <ion-icon slot="start" name="musical-notes" color="primary"></ion-icon>
+
       <ion-label>
-        <h2>{{ cancion.titulo }}</h2>
+        <h3>{{ cancion.titulo }}</h3>
         <p>{{ cancion.artista }} · {{ cancion.album }}</p>
       </ion-label>
-      <ion-note slot="end">{{ formatearDuracion(cancion.duracionSegundos) }}</ion-note>
+
+      <ion-note slot="end" class="duracion">
+        {{ formatearDuracion(cancion.duracionSegundos) }}
+      </ion-note>
+
+      <ion-button
+        fill="clear"
+        slot="end"
+        (click)="anadirAPlaylist(cancion, $event)">
+        <ion-icon slot="icon-only" name="add-circle-outline" color="medium"></ion-icon>
+      </ion-button>
+
     </ion-item>
   </ion-list>
-
-  <div *ngIf="!cargando && buscado && resultados.length === 0" class="empty-state">
-    <ion-icon name="musical-notes"></ion-icon>
-    <p>No se encontraron resultados</p>
-  </div>
-
-  <div *ngIf="!cargando && !buscado" class="empty-state">
-    <ion-icon name="musical-notes"></ion-icon>
-    <p>Busca canciones o artistas</p>
-  </div>
 
 </ion-content>

@@ -1,89 +1,174 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Mi Perfil</ion-title>
+    <ion-title>Mi perfil</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="cerrarSesion()" color="danger">
+        <ion-icon slot="icon-only" name="log-out-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content *ngIf="!cargando; else loadingTpl">
 
-  <!-- Cargando -->
-  <div *ngIf="cargando" class="ion-text-center ion-padding-top">
-    <ion-spinner name="crescent"></ion-spinner>
+  <!-- ── ERROR ── -->
+  <div *ngIf="!perfil" class="error-state">
+    <ion-icon name="person-circle" color="medium"></ion-icon>
+    <p>No se pudo cargar el perfil. Comprueba tu conexión.</p>
   </div>
 
-  <!-- Contenido cargado -->
-  <div *ngIf="!cargando && perfil">
+  <ng-container *ngIf="perfil">
 
-    <!-- Cabecera del perfil -->
-    <div class="perfil-header ion-text-center ion-padding-bottom">
+    <!-- ── CABECERA PERFIL ── -->
+    <div class="perfil-header">
       <ion-icon name="person-circle" class="avatar-icon"></ion-icon>
       <h2>{{ perfil.nombre }}</h2>
       <p class="email">{{ perfil.email }}</p>
-      <p class="fecha" *ngIf="perfil.fechaRegistro">
+      <p class="fecha">
         <ion-icon name="calendar-outline"></ion-icon>
         Miembro desde {{ formatearFecha(perfil.fechaRegistro) }}
       </p>
     </div>
+    <ion-button *ngIf="esAdmin()" expand="block" color="warning" routerLink="/admin">
+      <ion-icon name="shield-outline" slot="start"></ion-icon>
+      Panel de Administración
+    </ion-button>
 
-    <!-- Mis playlists -->
-    <h3 class="seccion-titulo">
-      <ion-icon name="list"></ion-icon> Mis playlists
-    </h3>
+    <!-- ── EDITAR PERFIL ── -->
+    <ion-list>
+      <ion-item button (click)="toggleEditarPerfil()">
+        <ion-icon slot="start" name="create-outline" color="primary"></ion-icon>
+        <ion-label>Editar perfil</ion-label>
+      </ion-item>
+    </ion-list>
 
-    <p *ngIf="playlists.length === 0" class="ion-text-center sin-playlists">
-      No tienes playlists todavía
-    </p>
+    <div class="form-section" *ngIf="editandoPerfil" [formGroup]="perfilForm">
+      <ion-item>
+        <ion-label position="stacked">Nombre</ion-label>
+        <ion-input formControlName="nombre" type="text"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Avatar (URL)</ion-label>
+        <ion-input formControlName="avatar" type="url" placeholder="https://..."></ion-input>
+      </ion-item>
+      <div class="form-buttons">
+        <ion-button fill="outline" (click)="toggleEditarPerfil()">Cancelar</ion-button>
+        <ion-button (click)="guardarPerfil()" [disabled]="perfilForm.invalid || guardandoPerfil">
+          <ion-spinner *ngIf="guardandoPerfil" name="crescent" slot="start"></ion-spinner>
+          Guardar
+        </ion-button>
+      </div>
+    </div>
+
+    <!-- ── CAMBIAR CONTRASEÑA ── -->
+    <ion-list>
+      <ion-item button (click)="toggleCambiarPassword()">
+        <ion-icon slot="start" name="lock-closed-outline" color="primary"></ion-icon>
+        <ion-label>Cambiar contraseña</ion-label>
+      </ion-item>
+    </ion-list>
+
+    <div class="form-section" *ngIf="cambiantoPassword" [formGroup]="passwordForm">
+      <ion-item>
+        <ion-label position="stacked">Contraseña actual</ion-label>
+        <ion-input formControlName="passwordActual" type="password"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Nueva contraseña</ion-label>
+        <ion-input formControlName="passwordNueva" type="password"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Confirmar nueva contraseña</ion-label>
+        <ion-input formControlName="passwordConfirm" type="password"></ion-input>
+      </ion-item>
+      <div class="form-buttons">
+        <ion-button fill="outline" (click)="toggleCambiarPassword()">Cancelar</ion-button>
+        <ion-button (click)="guardarPassword()" [disabled]="passwordForm.invalid || guardandoPassword">
+          <ion-spinner *ngIf="guardandoPassword" name="crescent" slot="start"></ion-spinner>
+          Actualizar
+        </ion-button>
+      </div>
+    </div>
+
+    <!-- ── MIS DISPOSITIVOS ── -->
+    <div class="section-header">
+      <ion-icon name="phone-portrait-outline"></ion-icon>
+      <h3>Mis dispositivos</h3>
+    </div>
+    <ion-list *ngIf="dispositivos.length > 0; else sinDispositivos">
+      <ion-item *ngFor="let d of dispositivos">
+        <ion-icon slot="start" name="phone-portrait-outline" [color]="d.dispositivoActivo ? 'success' : 'medium'">
+        </ion-icon>
+        <ion-label>
+          <h3>{{ d.dispositivo?.tipo || 'Dispositivo' }}</h3>
+          <p>{{ d.dispositivoActivo ? 'Sesión activa' : 'Sin sesión activa' }}</p>
+        </ion-label>
+        <ion-icon *ngIf="d.dispositivoActivo" slot="end" name="checkmark-circle" color="success">
+        </ion-icon>
+      </ion-item>
+    </ion-list>
+    <ng-template #sinDispositivos>
+      <p class="empty-text">No hay dispositivos registrados.</p>
+    </ng-template>
+
+    <!-- ── MIS PLAYLISTS ── -->
+    <div class="section-header">
+      <ion-icon name="list"></ion-icon>
+      <h3>Mis playlists</h3>
+      <ion-button fill="clear" size="small" (click)="crearPlaylist()">
+        <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
+      </ion-button>
+    </div>
+
+    <p *ngIf="playlists.length === 0" class="empty-text">No tienes playlists todavía.</p>
 
     <ion-accordion-group *ngIf="playlists.length > 0">
       <ion-accordion *ngFor="let playlist of playlists" [value]="playlist.id.toString()">
 
         <ion-item slot="header">
-          <ion-icon name="musical-notes" slot="start"></ion-icon>
+          <ion-icon slot="start" name="musical-notes" color="primary"></ion-icon>
           <ion-label>
             <h3>{{ playlist.nombre }}</h3>
             <p>{{ playlist.canciones.length }} canciones</p>
+            <p *ngIf="playlist.descripcion" class="descripcion">{{ playlist.descripcion }}</p>
           </ion-label>
+          <ion-button fill="clear" slot="end" (click)="editarPlaylist(playlist, $event)">
+            <ion-icon slot="icon-only" name="create-outline" color="medium"></ion-icon>
+          </ion-button>
+          <ion-button fill="clear" slot="end" (click)="eliminarPlaylist(playlist, $event)">
+            <ion-icon slot="icon-only" name="trash-outline" color="danger"></ion-icon>
+          </ion-button>
         </ion-item>
 
         <div slot="content">
-          <p *ngIf="playlist.descripcion" class="descripcion ion-padding-horizontal">
-            {{ playlist.descripcion }}
-          </p>
-
-          <ion-list *ngIf="playlist.canciones.length > 0">
-            <ion-item *ngFor="let item of playlist.canciones">
+          <ion-list *ngIf="playlist.canciones.length > 0; else playlistVacia">
+            <ion-item *ngFor="let pc of playlist.canciones">
+              <ion-icon slot="start" name="musical-notes" color="medium"></ion-icon>
               <ion-label>
-                <h4>{{ item.cancion.titulo }}</h4>
-                <ion-note>{{ item.cancion.artista }}</ion-note>
+                <h3>{{ pc.cancion.titulo }}</h3>
+                <p>{{ pc.cancion.artista }} · {{ formatearDuracion(pc.cancion.duracionSegundos) }}</p>
               </ion-label>
-              <ion-note slot="end">
-                {{ formatearDuracion(item.cancion.duracionSegundos) }}
-              </ion-note>
+              <ion-button fill="clear" slot="end"
+                (click)="eliminarCancionDePlaylist(playlist.id, pc.cancion.id, $event)">
+                <ion-icon slot="icon-only" name="trash-outline" color="danger"></ion-icon>
+              </ion-button>
             </ion-item>
           </ion-list>
-
-          <p *ngIf="playlist.canciones.length === 0"
-             class="ion-text-center ion-padding sin-canciones">
-            Esta playlist está vacía
-          </p>
+          <ng-template #playlistVacia>
+            <p class="empty-text">Esta playlist está vacía.</p>
+          </ng-template>
         </div>
 
       </ion-accordion>
     </ion-accordion-group>
 
-    <!-- Cerrar sesión -->
-    <div class="ion-padding-top ion-padding-bottom">
-      <ion-button expand="block" color="danger" (click)="cerrarSesion()">
-        <ion-icon name="log-out-outline" slot="start"></ion-icon>
-        Cerrar sesión
-      </ion-button>
-    </div>
-
-  </div>
-
-  <!-- Error al cargar -->
-  <div *ngIf="!cargando && !perfil" class="ion-text-center ion-padding-top">
-    <p>No se pudo cargar el perfil. Comprueba tu conexión.</p>
-  </div>
+  </ng-container>
 
 </ion-content>
+
+<!-- Loading template -->
+<ng-template #loadingTpl>
+  <ion-content class="ion-text-center ion-padding">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
+  </ion-content>
+</ng-template>

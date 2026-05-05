@@ -7,6 +7,7 @@ import { IonContent, IonItem, IonLabel, IonInput, IonButton, IonIcon } from '@io
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { musicalNotes } from 'ionicons/icons';
+import { ReproductorService } from 'src/app/services/reproductor.service';
 
 @Component({
   selector: 'app-login',
@@ -25,7 +26,8 @@ export class LoginPage {
     private authService: AuthService,
     private router: Router,
     private loadingCtrl: LoadingController,
-    private alertCtrl: AlertController
+    private alertCtrl: AlertController,
+    private reproductorService: ReproductorService
   ) {
     addIcons({ musicalNotes });
     this.loginForm = this.fb.group({
@@ -48,6 +50,7 @@ export class LoginPage {
       next: async () => {
         // El token y usuario ya se guardan automáticamente en auth.service tap()
         await loading.dismiss();
+        this.reproductorService.iniciarWS();
         this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
       },
       error: async () => {

@@ -1,0 +1,179 @@
+<ion-header>
+  <ion-toolbar color="dark">
+
+    <!-- ← Botón atrás -->
+    <ion-buttons slot="start">
+      <ion-button (click)="volver()">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title>Panel de Administración</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment [value]="segmentoActual" (ionChange)="cambiarSegmento($event)">
+      <ion-segment-button value="canciones">
+        <ion-icon name="musical-notes-outline"></ion-icon>
+        <ion-label>Canciones</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="usuarios">
+        <ion-icon name="person-outline"></ion-icon>
+        <ion-label>Usuarios</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+  <!-- ── SPINNER ─────────────────────────────────────── -->
+  <div *ngIf="cargando" style="display:flex;justify-content:center;padding:2rem">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <!-- ── CANCIONES ───────────────────────────────────── -->
+  <ng-container *ngIf="segmentoActual === 'canciones' && !cargando">
+    <ion-list>
+      <ion-item *ngFor="let c of canciones">
+        <ion-label>
+          <h2>{{ c.titulo }}</h2>
+          <p>{{ c.artista }} — {{ c.album }}</p>
+          <p>{{ c.duracionSegundos }}s</p>
+        </ion-label>
+        <ion-button fill="clear" slot="end" (click)="abrirModalEditar(c)">
+          <ion-icon name="create-outline"></ion-icon>
+        </ion-button>
+        <ion-button fill="clear" slot="end" color="danger" (click)="confirmarEliminarCancion(c)">
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </ion-list>
+
+    <!-- FAB subir canción -->
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+      <ion-fab-button (click)="modalAbierto = true" color="primary">
+        <ion-icon name="add-outline"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  </ng-container>
+
+  <!-- ── USUARIOS ────────────────────────────────────── -->
+  <ng-container *ngIf="segmentoActual === 'usuarios' && !cargando">
+    <ion-list>
+      <ion-item *ngFor="let u of usuarios">
+        <ion-label>
+          <h2>{{ u.nombre }}</h2>
+          <p>{{ u.email }}</p>
+        </ion-label>
+        <ion-chip [color]="u.rol === 'ADMIN' ? 'warning' : 'medium'" slot="end"
+                  (click)="cambiarRol(u)">
+          <ion-icon name="shield-outline"></ion-icon>
+          <ion-label>{{ u.rol }}</ion-label>
+        </ion-chip>
+        <ion-button fill="clear" slot="end" color="danger"
+                    (click)="confirmarEliminarUsuario(u)">
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </ion-list>
+  </ng-container>
+
+</ion-content>
+
+<!-- ── MODAL: SUBIR CANCIÓN ──────────────────────────── -->
+<ion-modal [isOpen]="modalAbierto" (didDismiss)="modalAbierto = false">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Nueva Canción</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="modalAbierto = false">Cerrar</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <form [formGroup]="formCancion">
+
+        <ion-item>
+          <ion-label position="floating">Título</ion-label>
+          <ion-input formControlName="titulo" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Artista</ion-label>
+          <ion-input formControlName="artista" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Álbum</ion-label>
+          <ion-input formControlName="album" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Duración (segundos)</ion-label>
+          <ion-input formControlName="duracion" type="number"></ion-input>
+        </ion-item>
+
+        <!-- Selector de archivo MP3 -->
+        <div style="padding: 1rem 0">
+          <input type="file" accept="audio/mpeg" (change)="seleccionarArchivo($event)"
+                 style="width:100%"/>
+          <p *ngIf="archivoSeleccionado" style="color:green;font-size:0.85rem;margin-top:4px">
+            ✓ {{ archivoSeleccionado.name }}
+          </p>
+        </div>
+
+        <ion-button expand="block" (click)="subirCancion()"
+                    [disabled]="formCancion.invalid || !archivoSeleccionado">
+          <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
+          Subir canción
+        </ion-button>
+
+      </form>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- ── MODAL: EDITAR CANCIÓN ─────────────────────────── -->
+<ion-modal [isOpen]="modalEditar" (didDismiss)="modalEditar = false">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Editar Canción</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="modalEditar = false">Cerrar</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <form [formGroup]="formEditar">
+
+        <ion-item>
+          <ion-label position="floating">Título</ion-label>
+          <ion-input formControlName="titulo" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Artista</ion-label>
+          <ion-input formControlName="artista" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Álbum</ion-label>
+          <ion-input formControlName="album" type="text"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="floating">Duración (segundos)</ion-label>
+          <ion-input formControlName="duracionSegundos" type="number"></ion-input>
+        </ion-item>
+
+        <ion-button expand="block" (click)="guardarEdicion()"
+                    [disabled]="formEditar.invalid">
+          Guardar cambios
+        </ion-button>
+
+      </form>
+    </ion-content>
+  </ng-template>
+</ion-modal>
