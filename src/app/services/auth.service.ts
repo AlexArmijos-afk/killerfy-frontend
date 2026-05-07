@@ -3,14 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Capacitor } from '@capacitor/core';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
 
-  private apiUrl      = 'http://localhost:8080/api/auth';
-  private usuariosUrl = 'http://localhost:8080/api/usuarios';
+  private apiUrl      = `${environment.apiUrl}/api/auth`;
+  private usuariosUrl = `${environment.apiUrl}/api/usuarios`;
 
   constructor(private http: HttpClient) {}
 

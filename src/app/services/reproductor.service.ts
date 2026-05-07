@@ -3,12 +3,13 @@ import { BehaviorSubject, Subscription } from 'rxjs';
 import { Cancion } from './musica.service';
 import { WebsocketService, ReproductorEvent } from './websocket.service';
 import { AuthService } from './auth.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ReproductorService implements OnDestroy {
 
   private audio = new Audio();
-  private readonly BASE_URL = 'http://localhost:8080';
+  private readonly BASE_URL = environment.apiUrl;
 
   private _cancionActual = new BehaviorSubject<Cancion | null>(null);
   private _cola          = new BehaviorSubject<Cancion[]>([]);
@@ -34,8 +35,13 @@ export class ReproductorService implements OnDestroy {
     private authService: AuthService
   ) {
     // Eventos del elemento Audio
-    this.audio.addEventListener('timeupdate', () =>
-      this._progreso.next(this.audio.currentTime));
+    this.audio.addEventListener('timeupdate', () => {
+  this._progreso.next(this.audio.currentTime);
+  // Emitir posición cada 5 segundos
+  if (Math.floor(this.audio.currentTime) % 5 === 0 && !this.ignorarEventoRemoto) {
+    this.emitirEvento({ tipo: 'SEEK', progreso: this.audio.currentTime });
+  }
+});
     this.audio.addEventListener('durationchange', () =>
       this._duracion.next(this.audio.duration || 0));
     this.audio.addEventListener('ended', () =>
@@ -62,35 +68,52 @@ export class ReproductorService implements OnDestroy {
 
   // ─── Procesar evento recibido de otro dispositivo ─────
   private procesarEventoRemoto(ev: ReproductorEvent) {
-    // Si este dispositivo fue quien emitió el evento, ignorarlo
-    if (this.ignorarEventoRemoto) return;
+  if (this.ignorarEventoRemoto) return;
+  console.log('[Reproductor] Evento remoto recibido:', ev.tipo);
 
-    console.log('[Reproductor] Evento remoto recibido:', ev.tipo);
-
-    switch (ev.tipo) {
-      case 'PLAY':
-        this.audio.play().catch(() => {});
-        break;
-      case 'PAUSE':
-        this.audio.pause();
-        break;
-      case 'SIGUIENTE':
-        this.siguiente(false); // false = no reemitir al WS
-        break;
-      case 'ANTERIOR':
-        this.anterior(false);
-        break;
-    }
+  switch (ev.tipo) {
+    case 'PLAY':
+      this.audio.play().catch(() => {});
+      break;
+    case 'PAUSE':
+      this.audio.pause();
+      break;
+    case 'SIGUIENTE':
+      this.siguiente(false);
+      break;
+    case 'ANTERIOR':
+      this.anterior(false);
+      break;
+    case 'CAMBIAR_CANCION':
+  if (ev.cancionId) {
+    this.audio.src = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`; // ← BASE_URL
+    this.audio.play().catch(() => {});
+    const todas = [
+      ...this._historial.getValue(),
+      ...(this._cancionActual.getValue() ? [this._cancionActual.getValue()!] : []),
+      ...this._cola.getValue()
+    ];
+    const cancion = todas.find(c => c.id === ev.cancionId);
+    if (cancion) this._cancionActual.next(cancion);
   }
+  break;
+    case 'SEEK':
+  if (ev.progreso !== undefined) {
+    this.audio.currentTime = ev.progreso;
+  }
+  break;
+  }
+}
 
   // ─── Reproducir canción ───────────────────────────────
   reproducir(cancion: Cancion, todasLasCanciones: Cancion[] = []) {
+    if (!cancion) return;
     const indice = todasLasCanciones.findIndex(c => c.id === cancion.id);
     this._cancionActual.next(cancion);
     this._cola.next(indice >= 0 ? todasLasCanciones.slice(indice + 1) : []);
     this._historial.next(indice > 0 ? todasLasCanciones.slice(0, indice) : []);
 
-    this.audio.src = `http://localhost:8080/api/canciones/${cancion.id}/stream`;
+    this.audio.src = `${this.BASE_URL}/api/canciones/${cancion.id}/stream`;
     this.audio.play().catch(() => {});
 
     this.emitirEvento({ tipo: 'CAMBIAR_CANCION', cancionId: cancion.id });
@@ -109,21 +132,21 @@ export class ReproductorService implements OnDestroy {
 
   // ─── Siguiente (emitirWS = false cuando viene de evento remoto) ──
   siguiente(emitirWS = true) {
-    const cola   = this._cola.getValue();
-    const actual = this._cancionActual.getValue();
-    if (!cola.length) return;
+  const cola = this._cola.getValue();
+  const actual = this._cancionActual.getValue();
+  if (!cola.length) return;
 
-    if (actual) {
-      this._historial.next([...this._historial.getValue(), actual]);
-    }
-    const siguiente = cola[0];
-    this._cancionActual.next(siguiente);
-    this._cola.next(cola.slice(1));
-    this.audio.src = `http://localhost:8080/api/canciones/${siguiente.id}/stream`;
-    this.audio.play().catch(() => {});
-
-    if (emitirWS) this.emitirEvento({ tipo: 'SIGUIENTE' });
+  if (actual) {
+    this._historial.next([...this._historial.getValue(), actual]);
   }
+  const siguiente = cola[0];
+  this._cancionActual.next(siguiente);
+  this._cola.next(cola.slice(1));
+  this.audio.src = `${this.BASE_URL}/api/canciones/${siguiente.id}/stream`;
+  this.audio.play().catch(() => {});
+
+  if (emitirWS) this.emitirEvento({ tipo: 'SIGUIENTE' });
+}
 
   // ─── Anterior ─────────────────────────────────────────
   anterior(emitirWS = true) {
@@ -137,13 +160,14 @@ export class ReproductorService implements OnDestroy {
       return;
     }
     const ant    = historial[historial.length - 1];
+    if (!ant) return;
     const actual = this._cancionActual.getValue();
     if (actual) {
       this._cola.next([actual, ...this._cola.getValue()]);
     }
     this._historial.next(historial.slice(0, -1));
     this._cancionActual.next(ant);
-    this.audio.src = `http://localhost:8080/api/canciones/${ant.id}/stream`;
+    this.audio.src = `${this.BASE_URL}/api/canciones/${ant.id}/stream`;
     this.audio.play().catch(() => {});
 
     if (emitirWS) this.emitirEvento({ tipo: 'ANTERIOR' });

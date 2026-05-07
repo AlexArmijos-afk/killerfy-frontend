@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Cancion } from './musica.service';
+import { environment } from '../../environments/environment';
 
 export interface UsuarioAdmin {
   id:             number;
@@ -15,7 +16,7 @@ export interface UsuarioAdmin {
 @Injectable({ providedIn: 'root' })
 export class AdminService {
 
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = `${environment.apiUrl}/api`;
 
   constructor(private http: HttpClient) {}
 

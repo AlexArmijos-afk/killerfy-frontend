@@ -1,15 +1,16 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface Cancion {
-  id:               number;
-  titulo:           string;
-  artista:          string;
-  album:            string;
+  id: number;
+  titulo: string;
+  artista: string;
+  album: string;
   duracionSegundos: number;
-  nombreArchivo?:   string;
-  urlImagen?:       string;
+  nombreArchivo?: string;
+  urlImagen?: string;
 }
 
 export interface Usuario {
@@ -36,9 +37,8 @@ export interface Playlist {
 
 @Injectable({ providedIn: 'root' })
 export class MusicaService {
-
-  private apiUrl = 'http://localhost:8080/api';
-  private readonly BASE_URL = 'http://localhost:8080';
+  private readonly BASE_URL = environment.apiUrl;
+  private apiUrl = `${environment.apiUrl}/api`;
 
   constructor(private http: HttpClient) {}
 
@@ -48,11 +48,15 @@ export class MusicaService {
   }
 
   buscarPorTitulo(titulo: string): Observable<Cancion[]> {
-    return this.http.get<Cancion[]>(`${this.apiUrl}/canciones/buscar?titulo=${titulo}`);
+    return this.http.get<Cancion[]>(
+      `${this.apiUrl}/canciones/buscar?titulo=${titulo}`,
+    );
   }
 
   buscarPorArtista(artista: string): Observable<Cancion[]> {
-    return this.http.get<Cancion[]>(`${this.apiUrl}/canciones/buscar?artista=${artista}`);
+    return this.http.get<Cancion[]>(
+      `${this.apiUrl}/canciones/buscar?artista=${artista}`,
+    );
   }
 
   // GET /api/canciones/{id}
@@ -60,9 +64,9 @@ export class MusicaService {
     return this.http.get<Cancion>(`${this.apiUrl}/canciones/${id}`);
   }
   getStreamUrl(cancionId: number): string {
-  return `${this.BASE_URL}/api/canciones/${cancionId}/stream`;
-}
-// ─── Playlists ─────────────────────────────────────
+    return `${this.BASE_URL}/api/canciones/${cancionId}/stream`;
+  }
+  // ─── Playlists ─────────────────────────────────────
 
   // Obtiene las playlists del usuario autenticado (usa el token)
   getMisPlaylists(): Observable<Playlist[]> {
@@ -74,11 +78,21 @@ export class MusicaService {
   }
 
   crearPlaylist(nombre: string, descripcion: string): Observable<Playlist> {
-    return this.http.post<Playlist>(`${this.apiUrl}/playlists`, { nombre, descripcion });
+    return this.http.post<Playlist>(`${this.apiUrl}/playlists`, {
+      nombre,
+      descripcion,
+    });
   }
 
-  actualizarPlaylist(id: number, nombre: string, descripcion: string): Observable<Playlist> {
-    return this.http.put<Playlist>(`${this.apiUrl}/playlists/${id}`, { nombre, descripcion });
+  actualizarPlaylist(
+    id: number,
+    nombre: string,
+    descripcion: string,
+  ): Observable<Playlist> {
+    return this.http.put<Playlist>(`${this.apiUrl}/playlists/${id}`, {
+      nombre,
+      descripcion,
+    });
   }
 
   eliminarPlaylist(id: number): Observable<void> {
@@ -87,14 +101,27 @@ export class MusicaService {
 
   // ─── Canciones de una playlist ─────────────────────
   getCancionesPlaylist(playlistId: number): Observable<PlaylistCancion[]> {
-    return this.http.get<PlaylistCancion[]>(`${this.apiUrl}/playlists/${playlistId}/canciones`);
+    return this.http.get<PlaylistCancion[]>(
+      `${this.apiUrl}/playlists/${playlistId}/canciones`,
+    );
   }
 
-  añadirCancionAPlaylist(playlistId: number, cancionId: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/playlists/${playlistId}/canciones/${cancionId}`, {});
+  añadirCancionAPlaylist(
+    playlistId: number,
+    cancionId: number,
+  ): Observable<any> {
+    return this.http.post(
+      `${this.apiUrl}/playlists/${playlistId}/canciones/${cancionId}`,
+      {},
+    );
   }
 
-  eliminarCancionDePlaylist(playlistId: number, cancionId: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/playlists/${playlistId}/canciones/${cancionId}`);
+  eliminarCancionDePlaylist(
+    playlistId: number,
+    cancionId: number,
+  ): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/playlists/${playlistId}/canciones/${cancionId}`,
+    );
   }
 }

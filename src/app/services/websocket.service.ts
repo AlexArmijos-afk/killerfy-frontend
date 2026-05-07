@@ -1,9 +1,11 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { Client, IMessage } from '@stomp/stompjs';
 import { Subject, BehaviorSubject } from 'rxjs';
+import { environment } from '../../environments/environment';
+import { logIn } from 'ionicons/icons';
 
 export interface ReproductorEvent {
-  tipo:          'PLAY' | 'PAUSE' | 'SIGUIENTE' | 'ANTERIOR' | 'CAMBIAR_CANCION' | 'TRANSFERIR';
+  tipo:          string;
   cancionId?:    number;
   progreso?:     number;
   dispositivo?:  string;
@@ -14,7 +16,7 @@ export interface ReproductorEvent {
 export class WebsocketService implements OnDestroy {
 
   // ws:// en lugar de http:// — WebSocket nativo sin SockJS
-  private readonly WS_URL = 'ws://localhost:8080/ws';
+  private readonly WS_URL = environment.apiUrl.replace('http', 'ws') + '/ws';
 
   private client!: Client;
   private _conectado = new BehaviorSubject<boolean>(false);
@@ -28,12 +30,13 @@ export class WebsocketService implements OnDestroy {
 
     this.client = new Client({
       brokerURL: this.WS_URL,
-      connectHeaders: { Authorization: `Bearer ${token}` },
+      connectHeaders: { Authorization: `Bearer ${token}`, login:email },
       reconnectDelay: 5000,
 
       onConnect: () => {
         this._conectado.next(true);
         console.log('[WS] Conectado como', email);
+        console.log('[WS] URL usada:', this.WS_URL); // ← añade esto
 
         this.client.subscribe(`/topic/reproductor/${email}`, (msg: IMessage) => {
           try {
@@ -57,6 +60,7 @@ export class WebsocketService implements OnDestroy {
 
       onWebSocketError: (event) => {
         console.error('[WS] Error WebSocket:', event);
+        console.error('[WS] URL que falló:', this.WS_URL); // ← y esto
         this._conectado.next(false);
       }
     });
