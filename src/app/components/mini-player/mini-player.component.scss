@@ -1,12 +1,15 @@
 .mini-player {
-  position: fixed;
+  /* position: fixed;
   bottom: 56px;
   left: 0;
   right: 0;
   background: #1e1e1e;
   border-top: 1px solid #333;
-  z-index: 999;
+  z-index: 999; */
+  background: #1e1e1e;
+  border-top: 1px solid #333;
   cursor: pointer;
+  width: 100%;
 
   .progreso-bar {
     height: 2px;

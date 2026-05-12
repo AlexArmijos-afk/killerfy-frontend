@@ -2,13 +2,12 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { Client, IMessage } from '@stomp/stompjs';
 import { Subject, BehaviorSubject } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { logIn } from 'ionicons/icons';
 
 export interface ReproductorEvent {
-  tipo:          string;
-  cancionId?:    number;
-  progreso?:     number;
-  dispositivo?:  string;
+  tipo: string;
+  cancionId?: number;
+  progreso?: number;
+  dispositivo?: string;
   usuarioEmail?: string;
 }
 
@@ -20,23 +19,23 @@ export class WebsocketService implements OnDestroy {
 
   private client!: Client;
   private _conectado = new BehaviorSubject<boolean>(false);
-  private _evento    = new Subject<ReproductorEvent>();
+  private _evento = new Subject<ReproductorEvent>();
 
   conectado$ = this._conectado.asObservable();
-  evento$    = this._evento.asObservable();
+  evento$ = this._evento.asObservable();
 
   conectar(token: string, email: string) {
     if (this.client?.active) return;
 
     this.client = new Client({
       brokerURL: this.WS_URL,
-      connectHeaders: { Authorization: `Bearer ${token}`, login:email },
+      connectHeaders: { Authorization: `Bearer ${token}`, login: email },
       reconnectDelay: 5000,
 
       onConnect: () => {
         this._conectado.next(true);
         console.log('[WS] Conectado como', email);
-        console.log('[WS] URL usada:', this.WS_URL); // ← añade esto
+        console.log('[WS] URL usada:', this.WS_URL);
 
         this.client.subscribe(`/topic/reproductor/${email}`, (msg: IMessage) => {
           try {
@@ -60,7 +59,7 @@ export class WebsocketService implements OnDestroy {
 
       onWebSocketError: (event) => {
         console.error('[WS] Error WebSocket:', event);
-        console.error('[WS] URL que falló:', this.WS_URL); // ← y esto
+        console.error('[WS] URL que falló:', this.WS_URL);
         this._conectado.next(false);
       }
     });

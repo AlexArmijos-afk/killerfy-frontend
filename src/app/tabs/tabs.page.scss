@@ -6,8 +6,9 @@ ion-tab-bar {
 
 app-mini-player {
   display: block;
-  position: sticky;
-  bottom: var(--ion-tab-bar-height, 56px);
-  z-index: 100;
-  width: 100%;
+  position: fixed;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  z-index: 999;
 }

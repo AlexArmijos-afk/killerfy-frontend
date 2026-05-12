@@ -38,3 +38,19 @@
 ion-content {
   --padding-bottom: 64px;
 }
+
+body.ion-palette-dark,
+.ion-palette-dark {
+  --ion-color-primary: #1db954;
+  --ion-background-color: #121212;
+  --ion-background-color-rgb: 18, 18, 18;
+  --ion-text-color: #ffffff;
+  --ion-text-color-rgb: 255, 255, 255;
+  --ion-toolbar-background: #1e1e1e;
+  --ion-tab-bar-background: #1e1e1e;
+  --ion-tab-bar-color: #888888;
+  --ion-tab-bar-color-selected: #1db954;
+  --ion-item-background: #1e1e1e;
+  --ion-card-background: #1e1e1e;
+  --ion-border-color: #333333;
+}

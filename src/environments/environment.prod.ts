@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://172.29.45.73:8080'
+  apiUrl: 'http://172.16.1.56:8080'  // ← IP directa, sin túnel
 };

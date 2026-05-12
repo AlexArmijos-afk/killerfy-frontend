@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router,RouterLink } from '@angular/router';
+import { ReproductorService } from 'src/app/services/reproductor.service';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle,
   IonList, IonItem, IonLabel, IonIcon,
@@ -63,7 +64,8 @@ export class PerfilPage implements OnInit, OnDestroy {
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
     private fb: FormBuilder,
-    private wsService: WebsocketService
+    private wsService: WebsocketService,
+    private reproductorService: ReproductorService
   ) {
     addIcons({
       personCircle, musicalNotes, list,
@@ -318,7 +320,7 @@ export class PerfilPage implements OnInit, OnDestroy {
   }
 
   cerrarSesion() {
-    this.wsService.desconectar(); // ← desconectar WS antes del logout
+    this.reproductorService.detener();
     this.authService.cerrarSesion().subscribe({
       next: () => this.router.navigateByUrl('/login', { replaceUrl: true }),
       error: () => {
