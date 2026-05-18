@@ -17,6 +17,14 @@
   <!-- add to homescreen for ios -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <script>
+  window.Ionic = window.Ionic || {};
+  // Detectar si es Electron (file://) o web/Android
+  const esElectron = window.location.protocol === 'file:';
+  window.Ionic.config = {
+    resourcesUrl: esElectron ? './ionicons/' : '/ionicons/'
+  };
+</script>
 </head>
 
 <body>

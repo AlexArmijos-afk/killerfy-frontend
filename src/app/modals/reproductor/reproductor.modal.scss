@@ -133,3 +133,50 @@ ion-list { background: transparent; }
   from { transform: scaleY(0.4); }
   to   { transform: scaleY(1); }
 }
+
+.dispositivo-section {
+  padding: 8px 16px 0;
+  border-top: 1px solid #2a2a2a;
+}
+
+.dispositivo-label {
+  color: #888;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  ion-icon { font-size: 14px; }
+}
+
+.dispositivo-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+}
+
+.chip-dispositivo {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ccc;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  ion-icon { font-size: 14px; }
+
+  &.activo {
+    border-color: #1db954;
+    color: #1db954;
+    background: #1a2e1a;
+  }
+}
+.check-icon {
+  font-size: 14px;
+  color: #1db954;
+  margin-left: 2px;
+}

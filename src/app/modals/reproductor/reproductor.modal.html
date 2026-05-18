@@ -8,7 +8,6 @@
 </ion-header>
 
 <ion-content>
-
   <div class="cancion-info" *ngIf="cancion">
     <div class="portada">
       <ion-icon name="musical-notes"></ion-icon>
@@ -24,7 +23,8 @@
       [value]="progreso"
       (ionKnobMoveStart)="onRangeStart()"
       (ionChange)="onRangeChange($event)"
-      (ionKnobMoveEnd)="onRangeEnd($event)">
+      (ionKnobMoveEnd)="onRangeEnd($event)"
+    >
     </ion-range>
     <div class="tiempos">
       <span>{{ formatearTiempo(progreso) }}</span>
@@ -33,33 +33,84 @@
   </div>
 
   <div class="controles">
+    <button
+      class="ctrl-btn"
+      (click)="reproductorService.toggleBucle()"
+      [style.color]="enBucle ? '#1db954' : 'white'"
+    >
+      <ion-icon name="repeat"></ion-icon>
+    </button>
     <button class="ctrl-btn" (click)="reproductorService.anterior()">
       <ion-icon name="play-skip-back"></ion-icon>
     </button>
-    <button class="ctrl-btn play-principal" (click)="reproductorService.togglePlay()">
-      <ion-icon [name]="reproduciendo ? 'pause-circle' : 'play-circle'"></ion-icon>
-    </button>
+    <button
+  class="ctrl-btn play-principal"
+  (click)="reproductorService.togglePlay()"
+>
+  <ion-icon
+    *ngIf="reproduciendo"
+    name="pause-circle"
+    style="color: #1db954; font-size: 68px;"
+  ></ion-icon>
+  <ion-icon
+    *ngIf="!reproduciendo"
+    name="play-circle"
+    style="color: #1db954; font-size: 68px;"
+  ></ion-icon>
+</button>
     <button class="ctrl-btn" (click)="reproductorService.siguiente()">
       <ion-icon name="play-skip-forward"></ion-icon>
     </button>
+    <button class="ctrl-btn" (click)="anadirAPlaylist()">
+      <ion-icon name="add-circle-outline"></ion-icon>
+    </button>
   </div>
-
+  <!-- REPRODUCIENDO EN -->
+  <div class="dispositivo-section" *ngIf="dispositivos.length > 0">
+  <p class="dispositivo-label">
+    <ion-icon name="phone-portrait-outline"></ion-icon>
+    Reproduciendo en
+  </p>
+  <div class="dispositivo-chips">
+    <button
+      *ngFor="let d of dispositivos"
+      class="chip-dispositivo"
+      [class.activo]="estaSeleccionado(d.dispositivo?.tipo)"
+      (click)="toggleDispositivo(d.dispositivo?.tipo)"
+    >
+      <ion-icon
+        [name]="d.dispositivo?.tipo === 'ANDROID' ? 'phone-portrait-outline' :
+                d.dispositivo?.tipo === 'DESKTOP'  ? 'desktop-outline' : 'globe-outline'">
+      </ion-icon>
+      {{ d.dispositivo?.tipo }}
+      <ion-icon
+        *ngIf="estaSeleccionado(d.dispositivo?.tipo)"
+        name="checkmark-circle"
+        class="check-icon">
+      </ion-icon>
+    </button>
+  </div>
+</div>
   <!-- COLA -->
-  <div class="cola-titulo" *ngIf="cancion">
-    Siguientes canciones
-  </div>
+  <div class="cola-titulo" *ngIf="cancion">Siguientes canciones</div>
 
   <ion-list *ngIf="cancion">
-
     <!-- Canción actual -->
     <ion-item class="cola-item activa">
       <div class="ecualizador" slot="start" *ngIf="reproduciendo">
         <span></span><span></span><span></span>
       </div>
-      <ion-icon name="musical-notes" slot="start" class="cola-icon" *ngIf="!reproduciendo"></ion-icon>
+      <ion-icon
+        name="musical-notes"
+        slot="start"
+        class="cola-icon"
+        *ngIf="!reproduciendo"
+      ></ion-icon>
       <ion-label>
         <h3 class="titulo-activo">{{ cancion.titulo }}</h3>
-        <p class="artista-activo">{{ cancion.artista }} · Reproduciendo ahora</p>
+        <p class="artista-activo">
+          {{ cancion.artista }} · Reproduciendo ahora
+        </p>
       </ion-label>
     </ion-item>
 
@@ -71,7 +122,5 @@
         <p>{{ c.artista }}</p>
       </ion-label>
     </ion-item>
-
   </ion-list>
-
 </ion-content>

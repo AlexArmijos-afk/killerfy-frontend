@@ -135,4 +135,10 @@ export class AuthService {
 esAdmin(): boolean {
   return this.obtenerRolesDelToken().includes('ADMIN');
 }
+verificarToken(): Observable<any> {
+  return this.http.get(`${environment.apiUrl}/api/auth/verificar`);
+}
+reactivarDispositivo(): Observable<any> {
+  return this.http.post(`${this.apiUrl}/reactivar`, {});
+}
 }

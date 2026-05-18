@@ -8,6 +8,7 @@ export interface ReproductorEvent {
   cancionId?: number;
   progreso?: number;
   dispositivo?: string;
+  dispositivosActivos?: string[];
   usuarioEmail?: string;
 }
 

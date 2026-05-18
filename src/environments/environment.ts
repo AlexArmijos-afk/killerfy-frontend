@@ -5,7 +5,7 @@
 // src/environments/environment.ts
 export const environment = {
   production: false,
-  apiUrl: 'http://172.16.1.56:8080'  // ← para el emulador
+  apiUrl: 'http://192.168.1.131:8080'  // ← para el emulador
 };
 
 /*
