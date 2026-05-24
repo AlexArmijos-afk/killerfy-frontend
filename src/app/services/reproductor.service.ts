@@ -3,7 +3,7 @@ import { BehaviorSubject, Subscription } from 'rxjs';
 import { Cancion, MusicaService } from './musica.service';
 import { WebsocketService, ReproductorEvent } from './websocket.service';
 import { AuthService } from './auth.service';
-import { filter, take } from 'rxjs/operators';
+import { distinctUntilChanged, filter } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -18,12 +18,12 @@ export class ReproductorService implements OnDestroy {
   private _progreso = new BehaviorSubject<number>(0);
   private _duracion = new BehaviorSubject<number>(0);
   private _volumen = new BehaviorSubject<number>(1);
-  private dispositivosActivos = new BehaviorSubject<string[]>([]);
+  private _dispositivosActivos = new BehaviorSubject<string[]>([]);
   private reproduciendoGlobal = new BehaviorSubject<boolean>(false);
   private progresoGlobal = new BehaviorSubject<number>(0);
   private progresoRemotoActual = 0;
 
-  dispositivosActivos$ = this.dispositivosActivos.asObservable();
+  dispositivosActivos$ = this._dispositivosActivos.asObservable();
   cancionActual$ = this._cancionActual.asObservable();
   cola$ = this._cola.asObservable();
   reproduciendo$ = this.reproduciendoGlobal.asObservable();
@@ -32,6 +32,11 @@ export class ReproductorService implements OnDestroy {
   volumen$ = this._volumen.asObservable();
 
   private subs = new Subscription();
+  private wsSyncSub?: Subscription;
+  // Catálogo completo de canciones cargado la primera vez que se llama a
+  // reproducir(). Se usa para resolver IDs de cola recibidos por WS sin
+  // tener que hacer N peticiones HTTP por cada canción en la cola.
+  private _catalogo: Cancion[] = [];
 
   /**
    * Contador de eventos propios en vuelo.
@@ -64,11 +69,7 @@ export class ReproductorService implements OnDestroy {
       this.progresoRemotoActual = this.audio.currentTime;
       // Emitir posición SEEK exactamente una vez por cada múltiplo de 5 s
       const seg = Math.floor(this.audio.currentTime);
-      if (
-        seg % 5 === 0 &&
-        seg !== this._ultimoSeekEmitido &&
-        this._ignorarContador === 0
-      ) {
+      if (seg % 5 === 0 && seg !== this._ultimoSeekEmitido) {
         this._ultimoSeekEmitido = seg;
         this.emitirEvento({ tipo: 'SEEK', progreso: this.audio.currentTime });
       }
@@ -77,10 +78,31 @@ export class ReproductorService implements OnDestroy {
     this.audio.addEventListener('durationchange', () =>
       this._duracion.next(this.audio.duration || 0),
     );
+    // Cada vez que se carga un nuevo recurso (cambio de canción local o remoto)
+    // reseteamos el último SEEK emitido para que el primer múltiplo de 5 s de
+    // la nueva canción genere un evento, incluso si coincide con el último de
+    // la canción anterior.
+    this.audio.addEventListener('loadstart', () => {
+      this._ultimoSeekEmitido = -1;
+    });
     this.audio.addEventListener('ended', () => this.siguiente(false));
     this.audio.addEventListener('play', () => this._reproduciendo.next(true));
     this.audio.addEventListener('pause', () => this._reproduciendo.next(false));
+    setInterval(() => {
+      if (!this.reproduciendoGlobal.getValue()) return; // nada reproduce globalmente
+      if (!this.audio.paused) return; // este dispositivo suena → el audio lo gestiona él solo
 
+      // Duración: preferimos la del elemento Audio, pero si no está cargado
+      // usamos duracionSegundos de los metadatos de la canción.
+      const duracion =
+        this._duracion.getValue() ||
+        (this._cancionActual.getValue()?.duracionSegundos ?? 0);
+
+      const progreso = this.progresoGlobal.getValue();
+      if (duracion > 0 && progreso < duracion) {
+        this.progresoGlobal.next(Math.min(progreso + 1, duracion));
+      }
+    }, 1000);
     // ── Escuchar eventos WS de otros dispositivos ─────────
     this.subs.add(
       this.wsService.evento$.subscribe((ev) => this.procesarEventoRemoto(ev)),
@@ -91,67 +113,126 @@ export class ReproductorService implements OnDestroy {
   iniciarWS() {
     const token = this.authService.obtenerToken();
     const usuario = this.authService.obtenerUsuario();
-    if (token && usuario?.email) {
-      this.authService.reactivarDispositivo().subscribe();
-      this.wsService.conectar(token, usuario.email);
-      this.wsService.conectar(token, usuario.email);
-      // ── Sincronizar estado al conectar ────────────────
-      // Cuando el WS está listo, pedimos el último estado
-      // para que el dispositivo nuevo se ponga al día
-      this.wsService.conectado$
-        .pipe(
-          filter((conectado) => conectado),
-          take(1), // solo la primera vez que conecta
-        )
-        .subscribe(() => {
-          this.sincronizarEstadoInicial();
-        });
-    }
+    if (!token || !usuario?.email) return;
+
+    // Primero reactivar el dispositivo en el servidor,
+    // luego conectar el WS para que el estado ya sea válido
+    // cuando sincronizarEstadoInicial intente cargar el stream.
+    this.authService.reactivarDispositivo().subscribe({
+      next: () => this._conectarWS(token, usuario.email),
+      error: () => this._conectarWS(token, usuario.email), // conectar igualmente aunque falle
+    });
+  }
+  private _conectarWS(token: string, email: string) {
+    this.wsService.conectar(token, email); // idempotente
+
+    // Resincronizar cada vez que pasemos de desconectado→conectado.
+    // Antes era take(1): al perderse la conexión (idle, app en background,
+    // proxy) los eventos publicados al topic mientras estábamos offline se
+    // descartaban y este dispositivo quedaba desfasado hasta recibir un
+    // evento nuevo estando online.
+    this.wsSyncSub?.unsubscribe();
+    this.wsSyncSub = this.wsService.conectado$
+      .pipe(
+        distinctUntilChanged(),
+        filter((conectado) => conectado),
+      )
+      .subscribe(() => this.sincronizarEstadoInicial());
+  }
+  private sincronizarEstadoInicial() {
+    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    this.authService.getMisDispositivos().subscribe({
+      next: (sesiones: any[]) => {
+        // ← antes filtraba por dispositivoActivo (conectado), no por reproduciendo (sonando)
+        const reproduciendo = sesiones
+          .filter((s: any) => s.reproduciendo)
+          .map((s: any) => s.dispositivo?.tipo as string);
+
+        if (reproduciendo.length > 0) {
+          this._dispositivosActivos.next(reproduciendo);
+        } else if (miDispositivo) {
+          this._dispositivosActivos.next([miDispositivo]);
+        }
+        this.cargarEstadoDelServidor();
+      },
+      error: () => {
+        if (miDispositivo) this._dispositivosActivos.next([miDispositivo]);
+        this.cargarEstadoDelServidor();
+      },
+    });
   }
 
-  private sincronizarEstadoInicial() {
+  private cargarEstadoDelServidor() {
     const headers = {
-      Authorization: `Bearer ${this.authService.obtenerToken()}`,
+      Authorization: 'Bearer ' + this.authService.obtenerToken(),
     };
-
-    fetch(`${this.BASE_URL}/api/reproductor/estado`, { headers })
+    fetch(this.BASE_URL + '/api/reproductor/estado', { headers })
       .then((res) => {
         if (res.status === 204) return null;
         return res.json();
       })
-      .then((estado: ReproductorEvent | null) => {
-        if (!estado?.cancionId) return; // sin estado o sin canción, nada que hacer
-        console.log('[Reproductor] Estado inicial recibido:', estado);
+      .then((estado: any | null) => {
+        if (!estado?.cancionId) return;
+        console.log('Reproductor: Estado recibido', estado);
 
-        // 1. Cargar el audio y los metadatos de la canción
-        // Llamamos directamente sin pasar por procesarEventoRemoto
-        // para evitar el guard _ignorarContador y el tipo incorrecto
-        this.audio.src = `${this.BASE_URL}/api/canciones/${estado.cancionId}/stream`;
+        const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+        const activos = this._dispositivosActivos.getValue();
+        const deboSonar = miDispositivo
+          ? activos.includes(miDispositivo)
+          : true;
+        const estaSonando = estado.tipo !== 'PAUSE';
 
-        // 2. Obtener metadatos de la canción
-        this.musicaService.getCancionPorId(estado.cancionId).subscribe({
-          next: (c: Cancion) => this._cancionActual.next(c),
-          error: (err: any) =>
-            console.error('[Reproductor] Error obteniendo canción:', err),
-        });
+        // Metadatos: solo refetch si la canción local no coincide
+        const actualLocal = this._cancionActual.getValue();
+        if (actualLocal?.id !== estado.cancionId) {
+          this.musicaService.getCancionPorId(estado.cancionId).subscribe({
+            next: (c: any) => this._cancionActual.next(c),
+            error: (err: any) =>
+              console.error('Reproductor: Error obteniendo canción', err),
+          });
+        }
 
-        // 3. Aplicar progreso y estado play/pause cuando el audio esté listo
-        this.audio.addEventListener(
-          'loadedmetadata',
-          () => {
-            if (estado.progreso) {
+        // Restaurar la cola si el servidor la guardó (solo CAMBIAR_CANCION la persiste)
+        if (Array.isArray(estado.cola) && estado.cola.length > 0) {
+          this._cola.next(estado.cola as Cancion[]);
+        }
+
+        const urlEsperada = `${this.BASE_URL}/api/canciones/${estado.cancionId}/stream`;
+        const yaEnEstaCancion =
+          this.audio.src === urlEsperada ||
+          this.audio.src.endsWith(`/canciones/${estado.cancionId}/stream`);
+
+        const aplicarEstado = () => {
+          if (typeof estado.progreso === 'number') {
+            const diff = Math.abs(this.audio.currentTime - estado.progreso);
+            if (diff > 3 && deboSonar) {
               this.audio.currentTime = estado.progreso;
             }
-            // Solo autoplay si el último estado era PLAY o SEEK (no PAUSE)
-            if (estado.tipo !== 'PAUSE') {
-              this.audio.play().catch(() => {});
-            }
-          },
-          { once: true },
-        );
+            this.progresoGlobal.next(estado.progreso);
+            this.progresoRemotoActual = estado.progreso;
+          }
+          if (deboSonar && estaSonando) {
+            this.audio.play().catch(() => {});
+          } else {
+            this.audio.pause();
+          }
+          this.reproduciendoGlobal.next(estaSonando);
+        };
+
+        if (yaEnEstaCancion) {
+          // No reasignamos src para no cortar la reproducción en curso
+          aplicarEstado();
+        } else {
+          this.audio.pause();
+          this.audio.src = urlEsperada;
+          this._ultimoSeekEmitido = -1;
+          this.audio.addEventListener('loadedmetadata', aplicarEstado, {
+            once: true,
+          });
+        }
       })
-      .catch((err) =>
-        console.error('[Reproductor] Error obteniendo estado inicial:', err),
+      .catch((err: any) =>
+        console.error('Reproductor: Error obteniendo estado inicial', err),
       );
   }
 
@@ -166,24 +247,30 @@ export class ReproductorService implements OnDestroy {
     this._duracion.next(0);
     this._ignorarContador = 0;
     this._ultimoSeekEmitido = -1;
+    this.wsSyncSub?.unsubscribe();
+    this.wsSyncSub = undefined;
     this.wsService.desconectar();
     this.progresoGlobal.next(0);
   }
 
   // ─── Procesar evento recibido de otro dispositivo ─────
   private procesarEventoRemoto(ev: ReproductorEvent) {
-    // TRANSFERIR siempre pasa, los demás consumen su eco
-    if (ev.tipo !== 'TRANSFERIR') {
-      if (this._ignorarContador > 0) {
-        this._ignorarContador--;
-        return;
-      }
-    }
-
     const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    if (ev.tipo !== 'TRANSFERIR' && ev.dispositivo === miDispositivo) {
+      return; // es el eco de mi propio evento, ignorar
+    }
     const activos: string[] =
-      ev.dispositivosActivos ?? this.dispositivosActivos.getValue();
+      ev.dispositivosActivos ?? this._dispositivosActivos.getValue();
     const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
+
+    // Mantener _dispositivosActivos sincronizado en todos los dispositivos.
+    // Sin esto, un receptor de CAMBIAR_CANCION con dispositivosActivos=['DESKTOP']
+    // procesa deboSonar bien para ese evento, pero su _dispositivosActivos sigue
+    // siendo ['WEB']. La próxima vez que emite SIGUIENTE usaría el valor viejo,
+    // transfiriendo la reproducción al dispositivo incorrecto.
+    if (ev.dispositivosActivos && ev.dispositivosActivos.length > 0) {
+      this._dispositivosActivos.next(activos);
+    }
 
     switch (ev.tipo) {
       case 'PLAY':
@@ -192,38 +279,102 @@ export class ReproductorService implements OnDestroy {
         break;
 
       case 'PAUSE':
-        this.reproduciendoGlobal.next(false); // ← actualiza el botón en todos los dispositivos
+        this.reproduciendoGlobal.next(false);
         this.audio.pause();
+        // dispositivosActivos vacío explícito = PAUSE por desconexión → limpiar selector
+        if (Array.isArray(ev.dispositivosActivos) && ev.dispositivosActivos.length === 0) {
+          this._dispositivosActivos.next([]);
+        }
         break;
 
-      case 'SIGUIENTE':
-        this.siguiente(false);
+      case 'SIGUIENTE': {
+        // Guardar canción actual en historial antes de cambiar
+        const actualAntes = this._cancionActual.getValue();
+        if (actualAntes) {
+          this._historial.next([...this._historial.getValue(), actualAntes]);
+        }
+        if (ev.cola !== undefined) {
+          this._cola.next(ev.cola as Cancion[]);
+        }
+        if (ev.cancionId) {
+          // Buscar en catálogo local para evitar petición HTTP
+          const cancionSig = this._resolverCancionDeEvento({ id: ev.cancionId });
+          if (cancionSig) {
+            this._cancionActual.next(cancionSig);
+          } else {
+            this.musicaService.getCancionPorId(ev.cancionId).subscribe({
+              next: (c: Cancion) => this._cancionActual.next(c),
+            });
+          }
+          if (deboSonar) {
+            this.audio.pause();
+            this.audio.src = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`;
+            this.audio.addEventListener(
+              'canplay',
+              () => { this.audio.play().catch(() => {}); },
+              { once: true },
+            );
+            this.reproduciendoGlobal.next(true);
+          }
+        } else {
+          this.siguiente(false);
+        }
         break;
+      }
 
-      case 'ANTERIOR':
-        this.anterior(false);
+      case 'ANTERIOR': {
+        if (ev.cola !== undefined) {
+          this._cola.next(ev.cola as Cancion[]);
+        }
+        const histAntes = this._historial.getValue();
+        this._historial.next(histAntes.slice(0, -1));
+        if (ev.cancionId) {
+          const cancionAnt =
+            histAntes.find((c) => c.id === ev.cancionId) ??
+            this._resolverCancionDeEvento({ id: ev.cancionId });
+          if (cancionAnt) {
+            this._cancionActual.next(cancionAnt);
+          } else {
+            this.musicaService.getCancionPorId(ev.cancionId).subscribe({
+              next: (c: Cancion) => this._cancionActual.next(c),
+            });
+          }
+          if (deboSonar) {
+            this.audio.pause();
+            this.audio.src = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`;
+            this.audio.addEventListener(
+              'canplay',
+              () => { this.audio.play().catch(() => {}); },
+              { once: true },
+            );
+            this.reproduciendoGlobal.next(true);
+          }
+        } else {
+          this.anterior(false);
+        }
         break;
+      }
 
       case 'CAMBIAR_CANCION':
         this.progresoRemotoActual = 0;
         this.reproduciendoGlobal.next(true);
+        if (ev.cola !== undefined) {
+          this._cola.next(ev.cola as Cancion[]);
+        }
         if (ev.cancionId) {
+          this.audio.pause();
           this.audio.src = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`;
-          // Solo hacer play si me toca sonar
           if (deboSonar) {
-            this.audio.play().catch(() => {});
+            this.audio.addEventListener(
+              'canplay',
+              () => { this.audio.play().catch(() => {}); },
+              { once: true },
+            );
           }
-          // Actualizar metadatos siempre, independientemente de si suena
-          const todas = [
-            ...this._historial.getValue(),
-            ...(this._cancionActual.getValue()
-              ? [this._cancionActual.getValue()!]
-              : []),
-            ...this._cola.getValue(),
-          ];
-          const local = todas.find((c) => c.id === ev.cancionId);
-          if (local) {
-            this._cancionActual.next(local);
+          // Buscar en catálogo local para evitar petición HTTP
+          const cancionCambiada = this._resolverCancionDeEvento({ id: ev.cancionId });
+          if (cancionCambiada) {
+            this._cancionActual.next(cancionCambiada);
           } else {
             this.musicaService.getCancionPorId(ev.cancionId).subscribe({
               next: (c: Cancion) => this._cancionActual.next(c),
@@ -247,74 +398,108 @@ export class ReproductorService implements OnDestroy {
         break;
 
       case 'TRANSFERIR':
-  this.dispositivosActivos.next(activos);
-
-  if (miDispositivo && activos.includes(miDispositivo)) {
-    const urlDestino = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`;
-    const yaEstaEstaCancion = this.audio.src.includes(`canciones/${ev.cancionId}`);
-    const yaEstabaSonando = !this.audio.paused; // ← clave: ¿ya estaba reproduciendo?
-
-    if (yaEstaEstaCancion) {
-      // Si ya tenía esta canción cargada...
-      if (yaEstabaSonando) {
-        // Ya estaba sonando → NO hacer seek, simplemente continuar
-        // Solo asegurarse de que sigue en play
-        this.audio.play().catch(() => {});
-      } else {
-        // Estaba pausado (dispositivo se reactiva) → sí hacer seek al progreso remoto
-        if (ev.progreso !== undefined) this.audio.currentTime = ev.progreso;
-        this.audio.play().catch(() => {});
-      }
-    } else {
-      // Canción diferente → cargar desde el progreso indicado
-      this.audio.src = urlDestino;
-      this.audio.addEventListener('loadedmetadata', () => {
-        if (ev.progreso !== undefined) this.audio.currentTime = ev.progreso;
-        this.audio.play().catch(() => {});
-      }, { once: true });
-    }
-
-    if (ev.cancionId) {
-      this.musicaService.getCancionPorId(ev.cancionId).subscribe({
-        next: (c: Cancion) => this._cancionActual.next(c),
-      });
-    }
-
-  } else {
-    // No me toca sonar
-    this.audio.pause();
-    if (ev.cancionId) {
-      this.musicaService.getCancionPorId(ev.cancionId).subscribe({
-        next: (c: Cancion) => this._cancionActual.next(c),
-      });
-    }
-    if (ev.progreso !== undefined) {
-      this.audio.currentTime = ev.progreso;
-      this.progresoRemotoActual = ev.progreso;
-    }
-  }
-  break;
+        this._dispositivosActivos.next(activos);
+        const estabaReproduciendo = this.reproduciendoGlobal.getValue();
+        if (miDispositivo && activos.includes(miDispositivo)) {
+          if (!ev.cancionId) break;
+          const urlDestino = `${this.BASE_URL}/api/canciones/${ev.cancionId}/stream`;
+          const yaEstaEstaCancion = this.audio.src.includes(
+            `canciones/${ev.cancionId}/stream`,
+          );
+          const yaEstaSonando = !this.audio.paused;
+          if (yaEstaEstaCancion && yaEstaSonando) {
+            // ya suena la canción correcta, no interrumpir
+          } else if (yaEstaEstaCancion && !yaEstaSonando) {
+            if (ev.progreso !== undefined) this.audio.currentTime = ev.progreso;
+            if (estabaReproduciendo) this.audio.play().catch(() => {});
+          } else {
+            this.audio.src = urlDestino;
+            this.audio.addEventListener(
+              'loadedmetadata',
+              () => {
+                if (ev.progreso !== undefined)
+                  this.audio.currentTime = ev.progreso;
+                if (estabaReproduciendo) this.audio.play().catch(() => {});
+              },
+              { once: true },
+            );
+          }
+          if (ev.cancionId) {
+            this.musicaService.getCancionPorId(ev.cancionId).subscribe({
+              next: (c: Cancion) => this._cancionActual.next(c),
+            });
+          }
+        } else {
+          this.audio.pause();
+          if (ev.cancionId) {
+            this.musicaService.getCancionPorId(ev.cancionId).subscribe({
+              next: (c: Cancion) => this._cancionActual.next(c),
+            });
+          }
+          if (ev.progreso !== undefined) {
+            this.progresoRemotoActual = ev.progreso;
+            this.progresoGlobal.next(ev.progreso);
+          }
+        }
+        break; // ← aquí, fuera del if/else
     }
   }
 
   // ─── Reproducir canción ───────────────────────────────
-  reproducir(cancion: Cancion, todasLasCanciones: Cancion[] = []) {
+  reproducir(cancion: Cancion, todasLasCanciones: Cancion[]) {
     if (!cancion) return;
+
+    // Actualizar catálogo local para resolver IDs de WS sin peticiones HTTP
+    if (todasLasCanciones.length > 0) this._catalogo = todasLasCanciones;
+
+    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    let activos = this._dispositivosActivos.getValue();
+    // Sin dispositivo seleccionado → reproducir en este dispositivo
+    if (miDispositivo && activos.length === 0) {
+      activos = [miDispositivo];
+      this._dispositivosActivos.next(activos);
+    }
+    const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
+
     const indice = todasLasCanciones.findIndex((c) => c.id === cancion.id);
     this._cancionActual.next(cancion);
     this._cola.next(indice >= 0 ? todasLasCanciones.slice(indice + 1) : []);
     this._historial.next(indice > 0 ? todasLasCanciones.slice(0, indice) : []);
 
-    this.audio.src = `${this.BASE_URL}/api/canciones/${cancion.id}/stream`;
-    this.audio.play().catch(() => {});
+    const yaEstaEstaCancion = this.audio.src.includes(
+      `canciones/${cancion.id}/stream`,
+    );
+    const yaEstaSonando = !this.audio.paused;
 
-    this.emitirEvento({ tipo: 'CAMBIAR_CANCION', cancionId: cancion.id });
+    if (deboSonar) {
+      // Si ya suena esta misma canción, no reiniciar
+      if (!(yaEstaEstaCancion && yaEstaSonando)) {
+        this.audio.src = `${this.BASE_URL}/api/canciones/${cancion.id}/stream`;
+        this.audio.play().catch(() => {});
+      }
+    } else {
+      // Este dispositivo no debe sonar: carga el src para tener los metadatos pero no reproduce
+      this.audio.src = `${this.BASE_URL}/api/canciones/${cancion.id}/stream`;
+      this.audio.pause();
+    }
+
+    this.reproduciendoGlobal.next(true);
+    this.emitirEvento({
+      tipo: 'CAMBIAR_CANCION',
+      cancionId: cancion.id,
+      cola: this._slimCola(this._cola.getValue()),
+    });
   }
 
   // ─── Play / Pausa ─────────────────────────────────────
   togglePlay() {
     const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
-    const activos = this.dispositivosActivos.getValue();
+    let activos = this._dispositivosActivos.getValue();
+    // Sin dispositivo seleccionado → usar este dispositivo al reanudar
+    if (miDispositivo && activos.length === 0) {
+      activos = [miDispositivo];
+      this._dispositivosActivos.next(activos);
+    }
     const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
     const estaReproduciendo = this.reproduciendoGlobal.getValue();
 
@@ -345,10 +530,31 @@ export class ReproductorService implements OnDestroy {
     const siguiente = cola[0];
     this._cancionActual.next(siguiente);
     this._cola.next(cola.slice(1));
-    this.audio.src = `${this.BASE_URL}/api/canciones/${siguiente.id}/stream`;
-    this.audio.play().catch(() => {});
 
-    if (emitirWS) this.emitirEvento({ tipo: 'SIGUIENTE' });
+    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    const activos = this._dispositivosActivos.getValue();
+    const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
+
+    this.audio.pause(); // ← para el audio anterior ANTES de cambiar src
+    this.audio.src = `${this.BASE_URL}/api/canciones/${siguiente.id}/stream`;
+
+    if (deboSonar) {
+      this.audio.addEventListener(
+        'canplay',
+        () => {
+          this.audio.play().catch(() => {});
+        },
+        { once: true },
+      );
+    }
+
+    this.reproduciendoGlobal.next(true);
+    if (emitirWS)
+      this.emitirEvento({
+        tipo: 'SIGUIENTE',
+        cancionId: siguiente.id,
+        cola: this._slimCola(this._cola.getValue()),
+      });
   }
 
   // ─── Anterior ─────────────────────────────────────────
@@ -369,16 +575,37 @@ export class ReproductorService implements OnDestroy {
     }
     this._historial.next(historial.slice(0, -1));
     this._cancionActual.next(ant);
-    this.audio.src = `${this.BASE_URL}/api/canciones/${ant.id}/stream`;
-    this.audio.play().catch(() => {});
 
-    if (emitirWS) this.emitirEvento({ tipo: 'ANTERIOR' });
+    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    const activos = this._dispositivosActivos.getValue();
+    const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
+
+    this.audio.pause(); // ← para el audio anterior ANTES de cambiar src
+    this.audio.src = `${this.BASE_URL}/api/canciones/${ant.id}/stream`;
+
+    if (deboSonar) {
+      this.audio.addEventListener(
+        'canplay',
+        () => {
+          this.audio.play().catch(() => {});
+        },
+        { once: true },
+      );
+    }
+
+    this.reproduciendoGlobal.next(true);
+    if (emitirWS)
+      this.emitirEvento({
+        tipo: 'ANTERIOR',
+        cancionId: ant.id,
+        cola: this._slimCola(this._cola.getValue()),
+      });
   }
 
   // ─── Buscar posición (seek) ───────────────────────────
   buscarPosicion(segundos: number) {
     const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
-    const activos = this.dispositivosActivos.getValue();
+    const activos = this._dispositivosActivos.getValue();
     const deboSonar = miDispositivo ? activos.includes(miDispositivo) : true;
 
     // Actualizar la barra visual inmediatamente en este dispositivo
@@ -404,20 +631,50 @@ export class ReproductorService implements OnDestroy {
     return this._volumen.getValue();
   }
 
+  // Versión reducida de la cola para enviar por WS: solo los campos necesarios
+  // para mostrar "Siguientes canciones". Excluye nombreArchivo (campo de servidor,
+  // nunca usado por el frontend) para reducir el tamaño del mensaje y evitar
+  // el cierre code=1009 (Message Too Big) con bibliotecas grandes.
+  private _slimCola(cola: Cancion[]): Partial<Cancion>[] {
+    return cola.map(({ id, titulo, artista, album, duracionSegundos, urlImagen }) => ({
+      id, titulo, artista, album, duracionSegundos, urlImagen,
+    }));
+  }
+
+  // Reconstruye una Cancion a partir de un objeto parcial recibido por WS.
+  // Busca en catálogo local primero para evitar peticiones HTTP extra.
+  private _resolverCancionDeEvento(parcial: any): Cancion | null {
+    if (!parcial?.id) return null;
+    const local =
+      this._catalogo.find((c) => c.id === parcial.id) ??
+      this._historial.getValue().find((c) => c.id === parcial.id) ??
+      this._cola.getValue().find((c) => c.id === parcial.id) ??
+      (this._cancionActual.getValue()?.id === parcial.id
+        ? this._cancionActual.getValue()
+        : null);
+    if (local) return local;
+    // El objeto parcial que llega por WS ya contiene los campos necesarios
+    // para mostrar la cola (titulo, artista, etc.), úsalo directamente.
+    if (parcial.titulo) return parcial as Cancion;
+    return null;
+  }
+
   /**
    * Emite un evento WS e incrementa el contador de eventos propios.
    * El contador se decrementa tras 500ms, margen suficiente para que
    * el eco del servidor llegue antes de que volvamos a escuchar.
    */
   private emitirEvento(evento: ReproductorEvent) {
-    evento.dispositivosActivos = this.dispositivosActivos.getValue();
+    if (evento.dispositivosActivos === undefined) {
+      evento.dispositivosActivos = this._dispositivosActivos.getValue();
+    }
     evento.dispositivo = this.authService.obtenerUsuario()?.dispositivo;
-    this._ignorarContador++;
     this.wsService.enviarEvento(evento);
   }
 
   ngOnDestroy() {
     this.subs.unsubscribe();
+    this.wsSyncSub?.unsubscribe();
     this.audio.pause();
   }
   toggleBucle() {
@@ -426,23 +683,39 @@ export class ReproductorService implements OnDestroy {
     this.audio.loop = nuevo;
   }
 
-  actualizarDispositivosSonando(seleccionados: string[]) {
+  actualizarDispositivosSonando(tipos: string[]) {
     const cancion = this._cancionActual.getValue();
     if (!cancion) return;
 
-    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
-    this.dispositivosActivos.next(seleccionados);
+    const progreso = !this.audio.paused
+      ? this.audio.currentTime
+      : this.progresoRemotoActual;
 
-    this.wsService.enviarEvento({
+    // ✅ Actualizar local primero, así el eco no pisa nada inesperado
+    this._dispositivosActivos.next(tipos);
+
+    // dispositivosActivos ya viene en el objeto → emitirEvento no lo sobreescribirá
+    this.emitirEvento({
       tipo: 'TRANSFERIR',
-      dispositivosActivos: seleccionados,
+      dispositivosActivos: tipos,
       cancionId: cancion.id,
-      progreso: this.progresoRemotoActual,
+      progreso,
     });
+  }
 
-    // Si yo NO estoy en la selección, pausar localmente
-    if (miDispositivo && !seleccionados.includes(miDispositivo)) {
+  setDispositivosActivos(tipos: string[]) {
+    this._dispositivosActivos.next(tipos);
+  }
+
+  pausarSiEsActivo() {
+    const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
+    const activos = this._dispositivosActivos.getValue();
+    const estaReproduciendo = this.reproduciendoGlobal.getValue();
+
+    if (miDispositivo && activos.includes(miDispositivo) && estaReproduciendo) {
       this.audio.pause();
+      this.reproduciendoGlobal.next(false);
+      this.emitirEvento({ tipo: 'PAUSE' });
     }
   }
 }

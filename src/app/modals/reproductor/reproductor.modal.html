@@ -67,10 +67,12 @@
   </div>
   <!-- REPRODUCIENDO EN -->
   <div class="dispositivo-section" *ngIf="dispositivos.length > 0">
+
   <p class="dispositivo-label">
-    <ion-icon name="phone-portrait-outline"></ion-icon>
+    <ion-icon name="musical-notes-outline"></ion-icon>
     Reproduciendo en
   </p>
+
   <div class="dispositivo-chips">
     <button
       *ngFor="let d of dispositivos"
@@ -82,14 +84,22 @@
         [name]="d.dispositivo?.tipo === 'ANDROID' ? 'phone-portrait-outline' :
                 d.dispositivo?.tipo === 'DESKTOP'  ? 'desktop-outline' : 'globe-outline'">
       </ion-icon>
-      {{ d.dispositivo?.tipo }}
+
+      {{ d.dispositivo?.tipo === 'ANDROID' ? 'Móvil' :
+         d.dispositivo?.tipo === 'DESKTOP'  ? 'Escritorio' : 'Web' }}
+
+      <!-- Icono de volumen en el dispositivo activo -->
       <ion-icon
         *ngIf="estaSeleccionado(d.dispositivo?.tipo)"
-        name="checkmark-circle"
-        class="check-icon">
+        name="volume-high-outline"
+        class="vol-icon">
       </ion-icon>
     </button>
   </div>
+
+  <p class="dispositivo-hint">
+    Toca un dispositivo para transferir la reproducción
+  </p>
 </div>
   <!-- COLA -->
   <div class="cola-titulo" *ngIf="cancion">Siguientes canciones</div>

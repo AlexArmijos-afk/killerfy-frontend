@@ -66,6 +66,7 @@ export class AppComponent implements OnInit {
   }
 
   private desconectarConBeacon() {
+    this.reproductorService.pausarSiEsActivo();
     const token = this.authService.obtenerToken();
     if (!token) return;
     const url = `${environment.apiUrl}/api/auth/dispositivo/desconectar`;
@@ -83,6 +84,7 @@ export class AppComponent implements OnInit {
   }
 
   private desconectarConHttp() {
+    this.reproductorService.pausarSiEsActivo();
     const token = this.authService.obtenerToken();
     if (!token) return;
     fetch(`${environment.apiUrl}/api/auth/dispositivo/desconectar`, {

@@ -36,7 +36,6 @@ import { AuthService } from '../../services/auth.service';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { WebsocketService } from 'src/app/services/websocket.service';
 
-
 @Component({
   selector: 'app-reproductor-modal',
   templateUrl: './reproductor.modal.html',
@@ -76,7 +75,7 @@ export class ReproductorModal implements OnInit, OnDestroy {
     private toastCtrl: ToastController,
     private authService: AuthService,
     private cdr: ChangeDetectorRef,
-    private wsService: WebsocketService
+    private wsService: WebsocketService,
   ) {}
 
   ngOnInit() {
@@ -124,44 +123,28 @@ export class ReproductorModal implements OnInit, OnDestroy {
     this.subs.add(
       this.reproductorService.enBucle$.subscribe((b) => (this.enBucle = b)),
     );
-    this.subs.add(
-      this.reproductorService.dispositivosActivos$.subscribe(
-        (d) => (this.dispositivosSeleccionados = d),
-      ),
-    );
-    this.subs.add(
-      this.reproductorService.dispositivosActivos$.subscribe((activos) => {
-        this.dispositivosSeleccionados = activos;
-        this.cdr.detectChanges();
-      }),
-    );
+    // ── dispositivosActivos → quién está sonando ──────────────────────────────
+this.subs.add(
+  this.reproductorService.dispositivosActivos$.subscribe((activos) => {
+    this.dispositivosSeleccionados = activos;
+    this.cdr.detectChanges();
+  }),  // ← coma + cierre del subs.add que faltaba
+);
 
-    this.subs.add(
-    this.wsService.evento$.subscribe(ev => {
-      if (ev.tipo === 'TRANSFERIR') {
-        this.cargarDispositivos();
-      }
-    })
-  );
+// ── Refrescar chips disponibles ante eventos relevantes ───────────────────
+this.subs.add(  // ← faltaba el subs.add
+  this.wsService.evento$.subscribe((ev) => {
+    if (['TRANSFERIR', 'PLAY', 'PAUSE', 'CAMBIAR_CANCION'].includes(ev.tipo)) {
+      this.cargarDispositivos();
+    }
+  }),
+);
 
-  // Carga inicial
-  this.cargarDispositivos();
-
-    // Cargar dispositivos e inicializar selección dentro del callback
-    this.authService.getMisDispositivos().subscribe({
-      next: (data: any[]) => {
-        this.dispositivos = data;
-        if (this.dispositivosSeleccionados.length === 0) {
-          const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
-          if (miDispositivo) {
-            this.dispositivosSeleccionados = [miDispositivo];
-          }
-        }
-      },
-    });
+    // Carga inicial
     setTimeout(() => {
-      this.cdr.detectChanges();
-    }, 50);
+  this.cargarDispositivos();
+  this.cdr.detectChanges();
+}, 300);
   }
 
   formatearTiempo(segundos: number): string {
@@ -172,23 +155,10 @@ export class ReproductorModal implements OnInit, OnDestroy {
   }
   private cargarDispositivos() {
   this.authService.getMisDispositivos().subscribe({
-    next: (data: any) => {
-      // ✅ Mostrar TODOS pero solo los activos son seleccionables
+    next: (data: any[]) => {
       this.dispositivos = data.filter((d: any) => d.dispositivoActivo);
-
-      // Limpiar selección si algún dispositivo seleccionado ya no está activo
-      const tiposActivos = this.dispositivos.map((d: any) => d.dispositivo?.tipo);
-      this.dispositivosSeleccionados = this.dispositivosSeleccionados
-        .filter(tipo => tiposActivos.includes(tipo));
-
-      // Si la selección quedó vacía, seleccionar el dispositivo actual
-      if (this.dispositivosSeleccionados.length === 0) {
-        const miDispositivo = this.authService.obtenerUsuario()?.dispositivo;
-        if (miDispositivo && tiposActivos.includes(miDispositivo)) {
-          this.dispositivosSeleccionados = [miDispositivo];
-        }
-      }
-
+      // ← eliminadas las líneas que sobreescribían dispositivosSeleccionados
+      // La fuente de verdad es dispositivosActivos$ del servicio
       this.cdr.detectChanges();
     }
   });
@@ -264,18 +234,17 @@ export class ReproductorModal implements OnInit, OnDestroy {
   }
 
   toggleDispositivo(tipo: string) {
-    const ya = this.dispositivosSeleccionados.includes(tipo);
-    let nuevaSeleccion: string[];
+  if (!tipo) return;
+  if (this.estaSeleccionado(tipo)) return; // Ya está sonando, no hacer nada
 
-    if (ya) {
-      if (this.dispositivosSeleccionados.length === 1) return; // no dejar vacío
-      nuevaSeleccion = this.dispositivosSeleccionados.filter((d) => d !== tipo);
-    } else {
-      nuevaSeleccion = [...this.dispositivosSeleccionados, tipo];
-    }
+  // ✅ Transferir exclusivamente a este dispositivo (solo uno puede sonar)
+  this.reproductorService.actualizarDispositivosSonando([tipo]);
 
-    this.reproductorService.actualizarDispositivosSonando(nuevaSeleccion);
-  }
+  // Actualización optimista local mientras el WS confirma
+  this.dispositivosSeleccionados = [tipo];
+  this.reproductorService.setDispositivosActivos([tipo]);
+  this.cdr.detectChanges();
+}
 
   estaSeleccionado(tipo: string): boolean {
     return this.dispositivosSeleccionados.includes(tipo);

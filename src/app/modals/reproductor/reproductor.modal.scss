@@ -13,10 +13,14 @@ ion-toolbar {
   border: none;
   cursor: pointer;
   color: white;
-  ion-icon { font-size: 24px; }
+  ion-icon {
+    font-size: 24px;
+  }
 }
 
-ion-content { --background: #121212; }
+ion-content {
+  --background: #121212;
+}
 
 .cancion-info {
   display: flex;
@@ -34,11 +38,23 @@ ion-content { --background: #121212; }
     align-items: center;
     justify-content: center;
     margin-bottom: 24px;
-    ion-icon { font-size: 80px; color: #1db954; }
+    ion-icon {
+      font-size: 80px;
+      color: #1db954;
+    }
   }
 
-  h2 { color: white; font-size: 20px; font-weight: bold; margin: 0 0 4px; }
-  p  { color: #888; font-size: 14px; margin: 0; }
+  h2 {
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    margin: 0 0 4px;
+  }
+  p {
+    color: #888;
+    font-size: 14px;
+    margin: 0;
+  }
 }
 
 .progreso-container {
@@ -74,7 +90,10 @@ ion-content { --background: #121212; }
     border: none;
     cursor: pointer;
     padding: 0;
-    ion-icon { font-size: 36px; color: white; }
+    ion-icon {
+      font-size: 36px;
+      color: white;
+    }
 
     &.play-principal ion-icon {
       font-size: 68px;
@@ -91,7 +110,9 @@ ion-content { --background: #121212; }
   border-top: 1px solid #2a2a2a;
 }
 
-ion-list { background: transparent; }
+ion-list {
+  background: transparent;
+}
 
 .cola-item {
   --background: #121212;
@@ -99,13 +120,21 @@ ion-list { background: transparent; }
   --border-color: #2a2a2a;
 }
 
-.cola-icon { color: #888; font-size: 18px; }
+.cola-icon {
+  color: #888;
+  font-size: 18px;
+}
 .activa {
   --background: #1a2e1a;
   --border-color: #1db954;
 
-  .titulo-activo { color: #1db954 !important; font-weight: 600; }
-  .artista-activo { color: #4caf7d !important; }
+  .titulo-activo {
+    color: #1db954 !important;
+    font-weight: 600;
+  }
+  .artista-activo {
+    color: #4caf7d !important;
+  }
 }
 
 .ecualizador {
@@ -123,15 +152,28 @@ ion-list { background: transparent; }
     border-radius: 2px;
     animation: ecualizador 0.8s ease-in-out infinite alternate;
 
-    &:nth-child(1) { height: 60%; animation-delay: 0s; }
-    &:nth-child(2) { height: 100%; animation-delay: 0.2s; }
-    &:nth-child(3) { height: 40%; animation-delay: 0.4s; }
+    &:nth-child(1) {
+      height: 60%;
+      animation-delay: 0s;
+    }
+    &:nth-child(2) {
+      height: 100%;
+      animation-delay: 0.2s;
+    }
+    &:nth-child(3) {
+      height: 40%;
+      animation-delay: 0.4s;
+    }
   }
 }
 
 @keyframes ecualizador {
-  from { transform: scaleY(0.4); }
-  to   { transform: scaleY(1); }
+  from {
+    transform: scaleY(0.4);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .dispositivo-section {
@@ -146,7 +188,9 @@ ion-list { background: transparent; }
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  ion-icon { font-size: 14px; }
+  ion-icon {
+    font-size: 14px;
+  }
 }
 
 .dispositivo-chips {
@@ -167,14 +211,43 @@ ion-list { background: transparent; }
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  transition: opacity 0.2s, border-color 0.2s;
+  opacity: 0.55;          // disponibles: más apagados
+
   ion-icon { font-size: 14px; }
+
+  &:hover:not(.activo) {
+    opacity: 0.9;
+    border-color: #666;   // feedback al pasar el ratón
+  }
 
   &.activo {
     border-color: #1db954;
     color: #1db954;
     background: #1a2e1a;
+    opacity: 1;
+  }
+
+  .vol-icon {
+    font-size: 14px;
+    color: #1db954;
   }
 }
+
+.dispositivo-hint {
+  color: #555;
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 0 2px 8px;
+}
+
+.dispositivo-hint {
+  color: #555;
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 0 2px 8px;
+}
+
 .check-icon {
   font-size: 14px;
   color: #1db954;
